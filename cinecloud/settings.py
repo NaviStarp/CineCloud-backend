@@ -22,6 +22,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-y!=_#k-p@ebq%usj-*m=e9!af)b9d38-(b!t(aqy(w&q2wm-oq'
 
+# URLS for archives
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -40,6 +44,10 @@ INSTALLED_APPS = [
     # Rest framework
     'rest_framework',
     'rest_framework_simplejwt',
+    'django_filters',
+    # Mi app
+    'movies',
+    'series',
 ]
 
 MIDDLEWARE = [
@@ -55,8 +63,19 @@ MIDDLEWARE = [
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
     ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10
 }
+
 
 ROOT_URLCONF = 'cinecloud.urls'
 
@@ -88,7 +107,7 @@ DATABASES = {
         'NAME': 'bd',  # DB Name
         'USER': 'admin',  # Username
         'PASSWORD': 'secret_password',  # Password
-        'HOST': 'db',  # <-- Usando docker (Nombre del servicio)
+        'HOST': 'localhost',  # <-- Usando localhost (Nombre del servicio)
         'PORT': '5432',  # Puerto por defecto de PostgreSQL
     }
 }
