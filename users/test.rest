@@ -1,0 +1,21 @@
+### Signup request
+POST http://localhost:8000/signup/
+Content-Type: application/json
+
+{
+    "username": "testuser",
+    "password": "testpassword"
+}
+
+### Login request
+POST http://localhost:8000/login/
+Content-Type: application/json
+
+{
+    "username": "testuser",
+    "password": "testpassword"
+}
+
+### Prueba request
+GET http://localhost:8000/prueba/
+Authorization: Token eba7b33c24ea24d73c72a88f5c8f7477e8fd0c2c

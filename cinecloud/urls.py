@@ -19,7 +19,7 @@ from django.urls import path,include
 from rest_framework.routers import DefaultRouter
 from series.views import SerieViewSet, EpisodioViewSet
 from movies.views import PeliculaViewSet
-
+from users.views import login,signup,prueba
 
 
 router = DefaultRouter()
@@ -29,4 +29,7 @@ router.register(r'episodios', EpisodioViewSet)
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
+    path('signup/', signup),
+    path('login/', login),
+    path('prueba/', prueba),    
 ]
