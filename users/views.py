@@ -80,3 +80,8 @@ def login(request):
 @permission_classes([IsAuthenticated])
 def prueba(request):
     return Response('Funciona')
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def authenticated(request):
+    return Response(True)
