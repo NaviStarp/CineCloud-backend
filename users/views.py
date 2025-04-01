@@ -45,6 +45,8 @@ def signup(request):
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+        user.username = user.username.lower()
+        user.save()
         
         # Crear el token de autenticación para el usuario
         token = Token.objects.create(user=user)
@@ -62,7 +64,7 @@ def login(request):
     # Obtener los datos de inicio de sesión
     username = request.data.get('username')
     password = request.data.get('password')
-    user = authenticate(username=username, password=password)
+    user = authenticate(username=username.lower(), password=password)
     
     if user:
         # Obtener el token existente o crear uno nuevo
