@@ -8,6 +8,13 @@ from django.core.files.base import ContentFile
 from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
 from datetime import datetime
+from django.http import JsonResponse
+from django.http import FileResponse
+from django.conf import settings
+from django.http import Http404
+import os
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 def status(request):
     return HttpResponse("OK")
@@ -108,3 +115,16 @@ def mediaView(request):
         "series": series,
         "episodios": episodios
     })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def protected_media(request, file_path):
+    # Construye la ruta completa al archivo en la carpeta media
+    file_path = os.path.join(settings.MEDIA_ROOT, file_path)
+    
+    # Verifica si el archivo existe
+    if not os.path.exists(file_path):
+        raise Http404("Archivo no encontrado.")
+    
+    # Sirve el archivo
+    return FileResponse(open(file_path, 'rb'))

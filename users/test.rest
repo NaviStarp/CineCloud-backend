@@ -17,5 +17,5 @@ Content-Type: application/json
 }
 
 ### Prueba request
-GET http://localhost:8000/prueba/
+GET http://localhost:8000/media/videos/Video%20gato
 Authorization: Token eba7b33c24ea24d73c72a88f5c8f7477e8fd0c2c
