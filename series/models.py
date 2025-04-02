@@ -3,7 +3,7 @@ from django.urls import reverse
 
 class Serie(models.Model):
     # Fields
-    titulo = models.CharField(max_length=255)
+    titulo = models.CharField(max_length=255, unique=True)
     descripcion = models.TextField()
     fecha_estreno = models.DateField()
     temporadas = models.IntegerField()

@@ -3,7 +3,7 @@ from django.urls import reverse
 
 class Pelicula(models.Model):
     # Fields
-    titulo = models.CharField(max_length=255)
+    titulo = models.CharField(max_length=255,unique=True)
     descripcion = models.TextField()
     fecha_estreno = models.DateField()
     duracion = models.IntegerField(help_text="Duración en minutos")

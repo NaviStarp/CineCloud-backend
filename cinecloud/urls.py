@@ -20,7 +20,7 @@ from rest_framework.routers import DefaultRouter
 from series.views import SerieViewSet, EpisodioViewSet
 from movies.views import PeliculaViewSet
 from users.views import login,signup,prueba,authenticated
-from .views import status
+from .views import status,upload_video,mediaView
 
 router = DefaultRouter()
 router.register(r'peliculas', PeliculaViewSet)
@@ -33,5 +33,7 @@ urlpatterns = [
     path('login/', login),
     path('prueba/', prueba),
     path('token/test/',authenticated ),
-    path('status/',status)    
+    path('status/',status),
+    path('media/upload/', upload_video),
+    path('media/', mediaView),
 ]
