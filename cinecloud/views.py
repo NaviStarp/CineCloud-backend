@@ -7,61 +7,94 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.utils.dateparse import parse_date
 from django.views.decorators.csrf import csrf_exempt
+from datetime import datetime
+
 def status(request):
     return HttpResponse("OK")
 
 @csrf_exempt
-def upload_video(request):  
-    print("Request: ", request)
+def upload_video(request):
     if request.method == 'POST':
-        try:
-            videos = request.POST.getlist('videos')
-            print("Videos : " +  videos)
-            for index, video_data in enumerate(videos):
-                name = video_data.get('name')
-                description = video_data.get('description')
-                release_date = parse_date(video_data.get('releaseDate'))
-                media_type = video_data.get('mediaType')
-                season = video_data.get('season')
-                chapter = video_data.get('chapter')
-                series_name = video_data.get('seriesName')
-
+        try:            
+            video_count = 0
+            for key in request.POST:
+                if key.startswith('videos[') and '][name]' in key:
+                    video_count = max(video_count, int(key.split('[')[1].split(']')[0]) + 1)
+            
+            print(f"Detected {video_count} videos in request")
+            
+            # Process each video entry
+            for index in range(video_count):
+                name = request.POST.get(f'videos[{index}][name]')
+                description = request.POST.get(f'videos[{index}][description]')
+                release_date_str = request.POST.get(f'videos[{index}][releaseDate]')
+                media_type = request.POST.get(f'videos[{index}][mediaType]')
+                season = request.POST.get(f'videos[{index}][season]')
+                chapter = request.POST.get(f'videos[{index}][chapter]')
+                series_name = request.POST.get(f'videos[{index}][seriesName]')
+                
                 video_file = request.FILES.get(f'videos[{index}][video]')
                 thumbnail_file = request.FILES.get(f'videos[{index}][thumbnail]')
-
-                # Guardar archivos en almacenamiento
-                video_path = default_storage.save(f'videos/{video_file.name}', ContentFile(video_file.read()))
-                thumbnail_path = default_storage.save(f'thumbnails/{thumbnail_file.name}', ContentFile(thumbnail_file.read()))
-
+                if not video_file or not name:
+                    print(f"Missing required data for video {index}")
+                    continue
+                
+                try:
+                    day = int(release_date_str)
+                    current_date = datetime.now()
+                    release_date = datetime(current_date.year, current_date.month, day)
+                except (ValueError, TypeError):
+                    try:
+                        release_date = parse_date(release_date_str) if release_date_str else datetime.now().date()
+                    except:
+                        release_date = datetime.now().date()
+                
+                if video_file:
+                    video_path = default_storage.save(f'videos/{video_file.name}', ContentFile(video_file.read()))
+                else:
+                    video_path = ""
+                    
+                if thumbnail_file:
+                    thumbnail_path = default_storage.save(f'thumbnails/{thumbnail_file.name}', ContentFile(thumbnail_file.read()))
+                else:
+                    thumbnail_path = ""
+                
                 if media_type == 'Pelicula':
                     pelicula = Pelicula(
                         titulo=name,
                         descripcion=description,
                         fecha_estreno=release_date,
+                        duracion=90,
                         imagen=thumbnail_path,
                         video=video_path
                     )
-                    print(pelicula)
+                    print(f"Saving movie: {name}")
                     pelicula.save()
+                    
                 elif media_type == 'series':
-                    serie, _ = Serie.objects.get_or_create(titulo=series_name)
+                    serie, created = Serie.objects.get_or_create(titulo=series_name)
                     episodio = Episodio(
                         serie=serie,
                         titulo=name,
                         descripcion=description,
                         fecha_estreno=release_date,
+                        duracion=30,
                         imagen=thumbnail_path,
                         video=video_path,
                         temporada=season,
                         capitulo=chapter
                     )
-                    print(episodio)
+                    print(f"Saving episode: {name} for series: {series_name}")
                     episodio.save()
-
+            
             return JsonResponse({"message": "Videos uploaded successfully"})
+            
         except Exception as e:
+            import traceback
+            print("Error uploading videos:", str(e))
+            print(traceback.format_exc())
             return JsonResponse({"error": str(e)}, status=400)
-
+    
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
 def mediaView(request):
