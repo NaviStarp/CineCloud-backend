@@ -39,7 +39,8 @@ def upload_video(request):
                 season = request.POST.get(f'videos[{index}][season]')
                 chapter = request.POST.get(f'videos[{index}][chapter]')
                 series_name = request.POST.get(f'videos[{index}][seriesName]')
-                
+                series_description = request.POST.get(f'videos[{index}][seriesDescription]')
+                series_releaseDate = request.POST.get(f'videos[{index}][seriesReleaseDate]')
                 video_file = request.FILES.get(f'videos[{index}][video]')
                 thumbnail_file = request.FILES.get(f'videos[{index}][thumbnail]')
                 if not video_file or not name:
@@ -79,18 +80,26 @@ def upload_video(request):
                     pelicula.save()
                     
                 elif media_type == 'series':
-                    serie, created = Serie.objects.get_or_create(titulo=series_name)
+                    serie, created = Serie.objects.get_or_create(titulo=series_name, defaults={
+                        "descripcion": series_description,
+                        "fecha_estreno": series_releaseDate,
+                        "temporadas": 1,
+                        "imagen": thumbnail_path
+                        })
                     episodio = Episodio(
                         serie=serie,
                         titulo=name,
                         descripcion=description,
-                        fecha_estreno=release_date,
-                        duracion=30,
+                        # fecha_estreno=release_date,
+                        # duracion=30,
                         imagen=thumbnail_path,
                         video=video_path,
                         temporada=season,
-                        capitulo=chapter
+                        numero=chapter
                     )
+                    if  int(episodio.temporada) > serie.temporadas:
+                        serie.temporadas = episodio.temporada
+                        serie.save()
                     print(f"Saving episode: {name} for series: {series_name}")
                     episodio.save()
             

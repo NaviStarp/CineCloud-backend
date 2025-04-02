@@ -1,12 +1,13 @@
 from django.db import models
 from django.urls import reverse
+from datetime import timedelta
 
 class Serie(models.Model):
     # Fields
     titulo = models.CharField(max_length=255, unique=True)
     descripcion = models.TextField()
     fecha_estreno = models.DateField()
-    temporadas = models.IntegerField()
+    temporadas = models.IntegerField(null=True, blank=True) # Temporal
     imagen = models.ImageField(upload_to='series/')
     
     class Meta:
