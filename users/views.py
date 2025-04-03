@@ -84,6 +84,7 @@ def prueba(request):
     return Response('Funciona')
 
 @api_view(['GET'])
+@authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def authenticated(request):
     return Response(True)

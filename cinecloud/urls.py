@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path,include
 from rest_framework.routers import DefaultRouter
-from series.views import SerieViewSet, EpisodioViewSet
+from series.views import SerieViewSet, EpisodioViewSet,getSeries,getEpisodiosPorSerie
 from movies.views import PeliculaViewSet
 from users.views import login,signup,prueba,authenticated
 from .views import status,upload_video,mediaView,protected_media
@@ -37,4 +37,6 @@ urlpatterns = [
     path('media/upload/', upload_video),
     path('media/', mediaView),
     path('media/<path:file_path>/', protected_media, name='protected_media'),
+    path('series/',getSeries, name='get_series'),
+    path('series/<int:pk>/', getEpisodiosPorSerie, name='get_episodios_por_serie')
 ]

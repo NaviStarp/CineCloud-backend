@@ -8,7 +8,11 @@ from .serializers import (
     SerieSimpleSerializer,
     EpisodioSerializer
 )
-
+import json
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.decorators import authentication_classes
 
 
 class SerieViewSet(viewsets.ModelViewSet):
@@ -50,3 +54,23 @@ class EpisodioViewSet(viewsets.ModelViewSet):
     filterset_fields = ['serie', 'temporada', 'numero']
     search_fields = ['titulo', 'descripcion']
     ordering_fields = ['temporada', 'numero']
+
+@api_view(['GET'])
+# @authentication_classes([TokenAuthentication])
+# @permission_classes([IsAuthenticated])
+def getSeries(request):
+    series = Serie.objects.all()
+    serializer = SerieSerializer(series, many=True)
+    return Response(serializer.data)
+
+
+
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def getEpisodiosPorSerie(request, pk):
+    serie = Serie.objects.get(pk=pk)
+    episodios = serie.episodios.all()
+    serializer = EpisodioSerializer(episodios, many=True)
+    return Response(serializer.data)
