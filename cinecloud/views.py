@@ -58,7 +58,7 @@ def upload_video(request):
                         release_date = datetime.now().date()
                 
                 if video_file:
-                    video_path = default_storage.save(f'videos/{video_file.name}', ContentFile(video_file.read()))
+                    video_path = default_storage.save(f'videos/{video_file.name}.mp4', ContentFile(video_file.read()))
                 else:
                     video_path = ""
                     
@@ -66,7 +66,12 @@ def upload_video(request):
                     thumbnail_path = default_storage.save(f'thumbnails/{thumbnail_file.name}', ContentFile(thumbnail_file.read()))
                 else:
                     thumbnail_path = ""
-                
+                if Pelicula.objects.filter(titulo=name).exists():
+                    print(f"Movie with name {name} already exists")
+                    continue
+                if Episodio.objects.filter(titulo=name).exists() and Serie.objects.filter(titulo=series_name).exists():
+                    print(f"Episode with name {name} already exists")
+                    continue
                 if media_type == 'Pelicula':
                     pelicula = Pelicula(
                         titulo=name,
