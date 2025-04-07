@@ -15,6 +15,8 @@ from django.http import Http404
 import os
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+import subprocess
+from .hls_utils import process_video_to_hls_multi_quality
 
 def status(request):
     return HttpResponse("OK")
@@ -28,9 +30,6 @@ def upload_video(request):
                 if key.startswith('videos[') and '][name]' in key:
                     video_count = max(video_count, int(key.split('[')[1].split(']')[0]) + 1)
             
-            print(f"Detected {video_count} videos in request")
-            
-            # Process each video entry
             for index in range(video_count):
                 name = request.POST.get(f'videos[{index}][name]')
                 description = request.POST.get(f'videos[{index}][description]')
@@ -43,36 +42,28 @@ def upload_video(request):
                 series_releaseDate = request.POST.get(f'videos[{index}][seriesReleaseDate]')
                 video_file = request.FILES.get(f'videos[{index}][video]')
                 thumbnail_file = request.FILES.get(f'videos[{index}][thumbnail]')
+
                 if not video_file or not name:
-                    print(f"Missing required data for video {index}")
                     continue
                 
                 try:
                     day = int(release_date_str)
                     current_date = datetime.now()
                     release_date = datetime(current_date.year, current_date.month, day)
-                except (ValueError, TypeError):
-                    try:
-                        release_date = parse_date(release_date_str) if release_date_str else datetime.now().date()
-                    except:
-                        release_date = datetime.now().date()
+                except:
+                    release_date = datetime.now().date()
                 
-                if video_file:
-                    video_path = default_storage.save(f'videos/{video_file.name}.mp4', ContentFile(video_file.read()))
-                else:
-                    video_path = ""
-                    
+                video_path = default_storage.save(f'videos/{video_file.name}', ContentFile(video_file.read()))
+                full_video_path = default_storage.path(video_path)
+
                 if thumbnail_file:
                     thumbnail_path = default_storage.save(f'thumbnails/{thumbnail_file.name}', ContentFile(thumbnail_file.read()))
                 else:
                     thumbnail_path = ""
-                if Pelicula.objects.filter(titulo=name).exists():
-                    print(f"Movie with name {name} already exists")
-                    continue
-                if Episodio.objects.filter(titulo=name).exists() and Serie.objects.filter(titulo=series_name).exists():
-                    print(f"Episode with name {name} already exists")
-                    continue
+
                 if media_type == 'Pelicula':
+                    if Pelicula.objects.filter(titulo=name).exists():
+                        continue
                     pelicula = Pelicula(
                         titulo=name,
                         descripcion=description,
@@ -81,42 +72,64 @@ def upload_video(request):
                         imagen=thumbnail_path,
                         video=video_path
                     )
-                    print(f"Saving movie: {name}")
                     pelicula.save()
-                    
+
+                    # Procesar a HLS
+                    output_dir = os.path.join(default_storage.location, f'hls/pelicula/{pelicula.titulo}')
+                    process_video_to_hls_multi_quality(full_video_path, output_dir)
+
                 elif media_type == 'series':
-                    serie, created = Serie.objects.get_or_create(titulo=series_name, defaults={
-                        "descripcion": series_description,
-                        "fecha_estreno": series_releaseDate,
-                        "temporadas": 1,
-                        "imagen": thumbnail_path
-                        })
+                    serie, _ = Serie.objects.get_or_create(
+                        titulo=series_name,
+                        defaults={
+                            "descripcion": series_description,
+                            "fecha_estreno": series_releaseDate,
+                            "temporadas": 1,
+                            "imagen": thumbnail_path
+                        }
+                    )
+                    if Episodio.objects.filter(titulo=name, serie=serie).exists():
+                        continue
+
                     episodio = Episodio(
                         serie=serie,
                         titulo=name,
                         descripcion=description,
-                        # fecha_estreno=release_date,
-                        # duracion=30,
                         imagen=thumbnail_path,
                         video=video_path,
                         temporada=season,
                         numero=chapter
                     )
-                    if  int(episodio.temporada) > serie.temporadas:
-                        serie.temporadas = episodio.temporada
+                    if int(season) > serie.temporadas:
+                        serie.temporadas = season
                         serie.save()
-                    print(f"Saving episode: {name} for series: {series_name}")
                     episodio.save()
-            
-            return JsonResponse({"message": "Videos uploaded successfully"})
-            
+
+                    # Procesar a HLS
+                    output_dir = os.path.join(default_storage.location, f'hls/serie/{serie.titulo}/{episodio.titulo}')
+                    process_video_to_hls_multi_quality(full_video_path, output_dir)
+
+            return JsonResponse({"message": "Videos uploaded and processed"})
+        
         except Exception as e:
             import traceback
-            print("Error uploading videos:", str(e))
             print(traceback.format_exc())
             return JsonResponse({"error": str(e)}, status=400)
-    
+
     return JsonResponse({"error": "Invalid request method"}, status=405)
+
+[IsAuthenticated]
+def serveHLS(request, file_path):
+    # Construye la ruta completa al archivo en la carpeta media
+    file_path = os.path.join(settings.MEDIA_ROOT, 'hls', file_path)
+    print(file_path)
+    # Verifica si el archivo existe
+    if not os.path.exists(file_path):
+        raise Http404("Archivo no encontrado.")
+    
+    # Sirve el archivo
+    return FileResponse(open(file_path, 'rb'))
+
 
 def mediaView(request):
     print("Peliculas: ", Pelicula.objects.all())
@@ -135,7 +148,6 @@ def mediaView(request):
 def protected_media(request, file_path):
     # Construye la ruta completa al archivo en la carpeta media
     file_path = os.path.join(settings.MEDIA_ROOT, file_path)
-    
     # Verifica si el archivo existe
     if not os.path.exists(file_path):
         raise Http404("Archivo no encontrado.")

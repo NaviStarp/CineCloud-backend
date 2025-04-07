@@ -56,8 +56,8 @@ class EpisodioViewSet(viewsets.ModelViewSet):
     ordering_fields = ['temporada', 'numero']
 
 @api_view(['GET'])
-# @authentication_classes([TokenAuthentication])
-# @permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
 def getSeries(request):
     series = Serie.objects.all()
     serializer = SerieSerializer(series, many=True)

@@ -20,7 +20,11 @@ from rest_framework.routers import DefaultRouter
 from series.views import SerieViewSet, EpisodioViewSet,getSeries,getEpisodiosPorSerie
 from movies.views import PeliculaViewSet
 from users.views import login,signup,prueba,authenticated
-from .views import status,upload_video,mediaView,protected_media
+from .views import status,upload_video,mediaView,protected_media,serveHLS
+from django.conf import settings
+from django.conf.urls.static import static
+from django.urls import re_path
+from django.views.static import serve
 
 router = DefaultRouter()
 router.register(r'peliculas', PeliculaViewSet)
@@ -37,6 +41,8 @@ urlpatterns = [
     path('media/upload/', upload_video),
     path('media/', mediaView),
     path('media/<path:file_path>/', protected_media, name='protected_media'),
+    # path('hls/<path:file_path>/', serveHLS, name='serve_hls'),
+    re_path(r'^hls/(?P<path>.*)$', serve, {'document_root': 'media/hls'}),
     path('series/',getSeries, name='get_series'),
     path('series/<int:pk>/', getEpisodiosPorSerie, name='get_episodios_por_serie')
 ]
