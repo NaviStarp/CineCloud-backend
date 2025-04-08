@@ -5,14 +5,23 @@ services:
     image: postgres:15
     restart: always
     environment:
-      POSTGRES_DB: bd # You can change the name of the database if you want
+      POSTGRES_DB: bd  # Puedes cambiar el nombre de la base de datos si lo deseas
       POSTGRES_USER: admin
-      POSTGRES_PASSWORD: secret_password # IMPORTANT Change your password
+      POSTGRES_PASSWORD: secret_password  # ¡Importante! Cambia la contraseña
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:latest
+    restart: always
+    ports:
+      - "6379:6379"  # El puerto por defecto de Redis
+    volumes:
+      - redis_data:/data
+
 volumes:
   postgres_data:
+  redis_data:
 

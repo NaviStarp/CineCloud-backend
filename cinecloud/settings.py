@@ -50,7 +50,20 @@ INSTALLED_APPS = [
     'movies',
     'series',
     'users',  
+    'channels',
+    'channels_redis'
 ]
+
+# Redis
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
+ASGI_APPLICATION = "cinecloud.asgi.application"
 
 # Configuración de CORS
 CORS_ALLOW_ALL_ORIGINS = True
