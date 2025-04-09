@@ -49,6 +49,7 @@ def convert_to_480p(input_path, output_dir):
     subprocess.run(command, check=True)
 
 def create_master_playlist(output_dir):
+    os.makedirs(output_dir, exist_ok=True)
     """Crea el archivo master playlist.m3u8"""
     master_playlist = """#EXTM3U
 #EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080

@@ -73,19 +73,19 @@ def upload_video(request):
                 thumbnail_path = ""
 
             send_progress_update(user.id, f"🗂️ Registrando metadata en base de datos...", 20)
-
             if media_type == 'Pelicula':
                 if Pelicula.objects.filter(titulo=name).exists():
                     send_progress_update(user.id, f"⚠️ Película '{name}' ya existe. Saltando...", 25,"warning")
                     continue
-
+                video_hls = "/hls/pelicula/" + name
+                print("RUTA DEL VIDEO : ", video_hls)
                 pelicula = Pelicula(
                     titulo=name,
                     descripcion=description,
                     fecha_estreno=release_date,
                     duracion=duration,
                     imagen=thumbnail_path,
-                    video=video_path
+                    video=video_hls
                 )
                 pelicula.save()
 
@@ -115,13 +115,13 @@ def upload_video(request):
                 if Episodio.objects.filter(titulo=name, serie=serie).exists():
                     send_progress_update(user.id, f"⚠️ Episodio '{name}' ya existe. Saltando...", 25,"warning")
                     continue
-
+                video_hls = "/hls/serie/" + serie.titulo + "/" + name
                 episodio = Episodio(
                     serie=serie,
                     titulo=name,
                     descripcion=description,
                     imagen=thumbnail_path,
-                    video=video_path,
+                    video=video_hls,
                     duracion=duration,
                     temporada=season,
                     numero=chapter
@@ -132,17 +132,19 @@ def upload_video(request):
                 episodio.save()
 
                 send_progress_update(user.id, f"⚙️ Procesando HLS de episodio '{name}'...", 60)
+
                 output_dir = os.path.join(default_storage.location, f'hls/serie/{serie.titulo}/{episodio.titulo}')
+                send_progress_update(user.id, f"⚙️ Creando playlist master de '{name}'...", 65)
+                create_master_playlist(output_dir)
                 send_progress_update(user.id, f"⚙️ Convirtiendo a 480p '{name}'...", 70)
                 convert_to_480p(full_video_path, output_dir)
                 send_progress_update(user.id, f"⚙️ Convirtiendo a 720p '{name}'...", 80)
                 convert_to_720p(full_video_path, output_dir)
-                send_progress_update(user.id, f"⚙️ Convirtiendo a 1080p '{name}'...", 85)
+                send_progress_update(user.id, f"⚙️ Convirtiendo a 1080p '{name}'...", 90)
                 convert_to_1080p(full_video_path, output_dir)
-                send_progress_update(user.id, f"⚙️ Creando playlist master de '{name}'...", 90)
-                create_master_playlist(output_dir)
                 send_progress_update(user.id, f"✅ Episodio '{name}' procesado correctamente", 100)
 
+        clean_videos()
         send_progress_update(user.id, f"🎉 Todos los videos han sido procesados", 100)
         return JsonResponse({"message": "Videos uploaded and processed"})
     
@@ -163,6 +165,16 @@ def serveHLS(request, file_path):
     
     # Sirve el archivo
     return FileResponse(open(file_path, 'rb'))
+
+def clean_videos():
+    # Elimina los archivos de video antiguos
+    video_dir = os.path.join(settings.MEDIA_ROOT, 'videos')
+    for filename in os.listdir(video_dir):
+        file_path = os.path.join(video_dir, filename)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+            print(f"Archivo eliminado: {file_path}")
+
 
 def send_progress_update(user_id, message, progress, status="info"):
     channel_layer = get_channel_layer()
