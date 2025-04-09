@@ -71,6 +71,8 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 
 ASGI_APPLICATION = "cinecloud.asgi.application"
+DATA_UPLOAD_MAX_MEMORY_SIZE = 1000000  # Sin límite
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1000000  # Sin límite
 
 # Configuración de CORS
 CORS_ALLOW_ALL_ORIGINS = True

@@ -3,6 +3,7 @@ import subprocess
 
 def convert_to_1080p(input_path, output_dir):
     """Convierte el video a calidad 1080p HLS"""
+    os.makedirs(output_dir, exist_ok=True)
     command = [
         'ffmpeg', '-i', input_path,
         '-vf', 'scale=w=1920:h=1080',
@@ -13,9 +14,14 @@ def convert_to_1080p(input_path, output_dir):
         os.path.join(output_dir, '1080p.m3u8')
     ]
     print("Procesando 1080p...")
-    subprocess.run(command, check=True)
-
+    try:
+        subprocess.run(command, check=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+    except subprocess.CalledProcessError as e:
+        print(f"Error during conversion: {e.stderr.decode()}")
+        raise
 def convert_to_720p(input_path, output_dir):
+    """Convierte el video a calidad 720p HLS"""
+    os.makedirs(output_dir, exist_ok=True)
     """Convierte el video a calidad 720p HLS"""
     command = [
         'ffmpeg', '-i', input_path,
@@ -27,9 +33,8 @@ def convert_to_720p(input_path, output_dir):
         os.path.join(output_dir, '720p.m3u8')
     ]
     print("Procesando 720p...")
-    subprocess.run(command, check=True)
-
 def convert_to_480p(input_path, output_dir):
+    os.makedirs(output_dir, exist_ok=True)
     """Convierte el video a calidad 480p HLS"""
     command = [
         'ffmpeg', '-i', input_path,
