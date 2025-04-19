@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'django_filters',
     'corsheaders',
     # Mi app
+    'cinecloud',
     'movies',
     'series',
     'users',  

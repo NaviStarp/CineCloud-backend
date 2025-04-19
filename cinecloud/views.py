@@ -15,7 +15,7 @@ from django.http import Http404
 import os
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from .hls_utils import convert_to_1080p,convert_to_480p,convert_to_720p,create_master_playlist
+from .hls_utils import process_video
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import threading
@@ -88,18 +88,16 @@ def upload_video(request):
                     video=video_hls
                 )
                 pelicula.save()
-
-                send_progress_update(user.id, f"⚙️ Procesando HLS de '{name}'...", 60)
                 output_dir = os.path.join(default_storage.location, f'hls/pelicula/{pelicula.titulo}')
-                send_progress_update(user.id, f"⚙️ Convirtiendo a 480p '{name}'...", 70)
-                convert_to_480p(full_video_path, output_dir)
-                send_progress_update(user.id, f"⚙️ Convirtiendo a 720p '{name}'...", 80)
-                convert_to_720p(full_video_path, output_dir)
-                send_progress_update(user.id, f"⚙️ Convirtiendo a 1080p '{name}'...", 85)
-                convert_to_1080p(full_video_path, output_dir)
-                send_progress_update(user.id, f"⚙️ Creando playlist master de '{name}'...", 90)
-                create_master_playlist(output_dir)
-
+                send_progress_update(user.id, f"⚙️ Procesando HLS de '{name}'...", 60)
+                process_video(full_video_path,output_dir)
+                # send_progress_update(user.id, f"⚙️ Convirtiendo a 480p '{name}'...", 70)
+                # convert_to_480p(full_video_path, output_dir)
+                # send_progress_update(user.id, f"⚙️ Convirtiendo a 720p '{name}'...", 80)
+                # convert_to_720p(full_video_path, output_dir)
+                # send_progress_update(user.id, f"⚙️ Convirtiendo a 1080p '{name}'...", 85)
+                # convert_to_1080p(full_video_path, output_dir)
+                # send_progress_update(user.id, f"⚙️ Creando playlist master de '{name}'...", 90)
                 send_progress_update(user.id, f"✅ Película '{name}' lista", 100)
 
             elif media_type == 'series':
@@ -130,18 +128,18 @@ def upload_video(request):
                     serie.temporadas = season
                     serie.save()
                 episodio.save()
-
-                send_progress_update(user.id, f"⚙️ Procesando HLS de episodio '{name}'...", 60)
+                send_progress_update(user.id, f"⚙️ Creando playlist master de '{name}'...", 35)
+                create_master_playlist(output_dir)
+                send_progress_update(user.id, f"⚙️ Procesando HLS de episodio '{name}'...", 40)
 
                 output_dir = os.path.join(default_storage.location, f'hls/serie/{serie.titulo}/{episodio.titulo}')
-                send_progress_update(user.id, f"⚙️ Creando playlist master de '{name}'...", 65)
-                create_master_playlist(output_dir)
-                send_progress_update(user.id, f"⚙️ Convirtiendo a 480p '{name}'...", 70)
-                convert_to_480p(full_video_path, output_dir)
-                send_progress_update(user.id, f"⚙️ Convirtiendo a 720p '{name}'...", 80)
-                convert_to_720p(full_video_path, output_dir)
-                send_progress_update(user.id, f"⚙️ Convirtiendo a 1080p '{name}'...", 90)
-                convert_to_1080p(full_video_path, output_dir)
+                process_video(full_video_path,output_dir)
+                # send_progress_update(user.id, f"⚙️ Convirtiendo a 480p '{name}'...", 70)
+                # convert_to_480p(full_video_path, output_dir)
+                # send_progress_update(user.id, f"⚙️ Convirtiendo a 720p '{name}'...", 80)
+                # convert_to_720p(full_video_path, output_dir)
+                # send_progress_update(user.id, f"⚙️ Convirtiendo a 1080p '{name}'...", 90)
+                # convert_to_1080p(full_video_path, output_dir)
                 send_progress_update(user.id, f"✅ Episodio '{name}' procesado correctamente", 100)
 
         clean_videos()

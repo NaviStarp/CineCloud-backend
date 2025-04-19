@@ -1,6 +1,7 @@
 from django.db import models
 from django.urls import reverse
 from datetime import timedelta
+from cinecloud.models import Categoria 
 
 class Serie(models.Model):
     # Fields
@@ -8,6 +9,7 @@ class Serie(models.Model):
     descripcion = models.TextField()
     fecha_estreno = models.DateField()
     temporadas = models.IntegerField(null=True, blank=True) # Temporal
+    categorias = models.ManyToManyField(Categoria, blank=True)
     imagen = models.ImageField(upload_to='series/')
     
     class Meta:
