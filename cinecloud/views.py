@@ -129,7 +129,6 @@ def upload_video(request):
                     serie.save()
                 episodio.save()
                 send_progress_update(user.id, f"⚙️ Creando playlist master de '{name}'...", 35)
-                create_master_playlist(output_dir)
                 send_progress_update(user.id, f"⚙️ Procesando HLS de episodio '{name}'...", 40)
 
                 output_dir = os.path.join(default_storage.location, f'hls/serie/{serie.titulo}/{episodio.titulo}')
