@@ -152,6 +152,12 @@ def upload_video(request):
         return JsonResponse({"error": str(e)}, status=400)
 
 [IsAuthenticated]
+def getCategories(request):
+    # Obtiene todas las categorías de películas
+    categories = Pelicula.objects.values_list('categorias', flat=True).distinct()
+    return JsonResponse({"categories": list(categories)})
+
+[IsAuthenticated]
 def serveHLS(request, file_path):
     # Construye la ruta completa al archivo en la carpeta media
     file_path = os.path.join(settings.MEDIA_ROOT, 'hls', file_path)

@@ -17,10 +17,10 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path,include
 from rest_framework.routers import DefaultRouter
-from series.views import SerieViewSet, EpisodioViewSet,getSeries,getEpisodiosPorSerie
+from series.views import SerieViewSet, EpisodioViewSet,getSeries,getEpisodiosPorSerie,newSeries
 from movies.views import PeliculaViewSet
 from users.views import login,signup,prueba,authenticated
-from .views import status,upload_video,mediaView,protected_media,serveHLS
+from .views import status,upload_video,mediaView,protected_media,serveHLS,getCategories
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import re_path
@@ -40,6 +40,8 @@ urlpatterns = [
     path('status/',status),
     path('media/upload/', upload_video),
     path('media/', mediaView),
+    path('categories/', getCategories),
+    path('series/new/',newSeries, name='new_series'),
     path('media/<path:file_path>/', protected_media, name='protected_media'),
     # path('hls/<path:file_path>/', serveHLS, name='serve_hls'),
     re_path(r'^hls/(?P<path>.*)$', serve, {'document_root': 'media/hls'}),

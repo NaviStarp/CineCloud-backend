@@ -13,6 +13,14 @@ def has_nvidia_gpu():
         return 'h264_nvenc' in result.stdout.decode()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
+def has_amd_gpu():
+    """Verifica si hay una GPU AMD disponible con soporte para VCE"""
+    try:
+        subprocess.run(['lspci'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = subprocess.run(['ffmpeg', '-encoders'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return 'h264_amf' in result.stdout.decode()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
 
 def get_video_encoder_settings():
     """Determina los ajustes de codificación según la disponibilidad de GPU"""
@@ -22,6 +30,13 @@ def get_video_encoder_settings():
             'encoder': 'h264_nvenc',
             'preset': '-preset',
             'preset_value': 'p4'
+        }
+    elif has_amd_gpu():
+        print("GPU AMD detectada, usando aceleración por hardware")
+        return {
+            'encoder': 'h264_amf',
+            'preset': '-preset',
+            'preset_value': 'medium'
         }
     else:
         print("No se detectó GPU NVIDIA, usando codificación por CPU")

@@ -15,6 +15,33 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import authentication_classes
 
 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def newSeries(request):
+    data = request.data
+    titulo = data.get('titulo')
+    descripcion = data.get('descripcion')
+    fecha_estreno = data.get('fecha_estreno')
+    temporadas = data.get('temporadas')
+    imagen = request.FILES.get('imagen')
+
+    if not all([titulo, descripcion, fecha_estreno, temporadas, imagen]):
+        return Response({"error": "Todos los campos son obligatorios"}, status=400)
+
+    try:
+        nueva_serie = Serie.objects.create(
+            titulo=titulo,
+            descripcion=descripcion,
+            fecha_estreno=fecha_estreno,
+            temporadas=temporadas,
+            imagen=imagen
+        )
+        serializer = SerieSerializer(nueva_serie)
+        return Response(serializer.data, status=201)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
 class SerieViewSet(viewsets.ModelViewSet):
     queryset = Serie.objects.all()
     serializer_class = SerieSerializer
