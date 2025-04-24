@@ -18,8 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 from .hls_utils import process_video
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
-import threading
-import time
+from .models import Categoria
 from .settings import AUTH_USER_MODEL as Users
 def status(request):
     return HttpResponse("OK")
@@ -150,6 +149,25 @@ def upload_video(request):
         print(traceback.format_exc())
         send_progress_update(user.id, f"❌ Error durante la subida: {str(e)}", 0,"error")
         return JsonResponse({"error": str(e)}, status=400)
+
+[IsAuthenticated]
+def newCategory(request):
+    # Crea una nueva categoría de películas
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        nombre = data.get('name')
+        if not nombre:
+            return JsonResponse({"error": "No se proporcionó la categoría"}, status=400)
+        
+        # Guarda la nueva categoría en la base de datos
+        categoria = Categoria(nombre=nombre)
+        try:
+            categoria.save()
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+        return JsonResponse({"message": "Categoría creada exitosamente"})
+    else:
+        return JsonResponse({"error": "Método no permitido"}, status=405)
 
 [IsAuthenticated]
 def getCategories(request):
