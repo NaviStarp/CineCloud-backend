@@ -13,7 +13,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import authentication_classes
-
+from cinecloud.models import Categoria
 
 
 @api_view(['POST'])
@@ -26,19 +26,35 @@ def newSeries(request):
     temporadas = data.get('temporadas')
     categorias = data.get('categorias')
     imagen = request.FILES.get('imagen')
-    print("categorias",categorias)
-    if isinstance(categorias, str):
-        try:
-            categorias = json.loads(categorias)
-        except json.JSONDecodeError:
-            return Response({"error": "Formato de categorías inválido"}, status=400)
     
-    if not isinstance(categorias, list) or not all(isinstance(cat, int) for cat in categorias):
-        return Response({"error": "Las categorías deben ser una lista de IDs numéricos"}, status=400)
+    # Validar que todos los campos requeridos existan
     if not all([titulo, descripcion, fecha_estreno, temporadas, imagen]):
         return Response({"error": "Todos los campos son obligatorios"}, status=400)
-
+    
+    # Convertir temporadas a entero si es necesario
     try:
+        temporadas = int(temporadas)
+    except (ValueError, TypeError):
+        return Response({"error": "El valor de temporadas debe ser un número"}, status=400)
+    
+    # Procesar categorías
+    categorias_obj = None
+    if categorias:
+        # Si categorias es una cadena, intentar convertirla a lista
+        if isinstance(categorias, str):
+            try:
+                categorias = json.loads(categorias)
+            except json.JSONDecodeError:
+                return Response({"error": "Formato de categorías inválido"}, status=400)
+        
+        # Verificar que todas las categorías existan
+        categorias_obj = Categoria.objects.filter(nombre__in=categorias)
+        print(categorias_obj.values_list('nombre', flat=True))
+        if categorias_obj.count() != len(categorias):
+            return Response({"error": "Una o más categorías no existen"}, status=400)
+    
+    try:
+        # Crear la serie
         nueva_serie = Serie.objects.create(
             titulo=titulo,
             descripcion=descripcion,
@@ -46,8 +62,11 @@ def newSeries(request):
             temporadas=temporadas,
             imagen=imagen
         )
-        if categorias:
-            nueva_serie.categorias.set(categorias)
+        
+        # Asignar categorías si existen
+        if categorias_obj:
+            nueva_serie.categorias.set(categorias_obj)
+        
         serializer = SerieSerializer(nueva_serie)
         return Response(serializer.data, status=201)
     except Exception as e:

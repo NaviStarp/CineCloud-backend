@@ -20,6 +20,7 @@ class SerieSerializer(serializers.ModelSerializer):
     class Meta:
         model = Serie
         fields = '__all__'
+        depth = 1
 
 
 class SerieSimpleSerializer(serializers.ModelSerializer):
