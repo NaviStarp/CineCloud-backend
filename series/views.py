@@ -24,8 +24,17 @@ def newSeries(request):
     descripcion = data.get('descripcion')
     fecha_estreno = data.get('fecha_estreno')
     temporadas = data.get('temporadas')
+    categorias = data.get('categorias')
     imagen = request.FILES.get('imagen')
-
+    print("categorias",categorias)
+    if isinstance(categorias, str):
+        try:
+            categorias = json.loads(categorias)
+        except json.JSONDecodeError:
+            return Response({"error": "Formato de categorías inválido"}, status=400)
+    
+    if not isinstance(categorias, list) or not all(isinstance(cat, int) for cat in categorias):
+        return Response({"error": "Las categorías deben ser una lista de IDs numéricos"}, status=400)
     if not all([titulo, descripcion, fecha_estreno, temporadas, imagen]):
         return Response({"error": "Todos los campos son obligatorios"}, status=400)
 
@@ -37,6 +46,8 @@ def newSeries(request):
             temporadas=temporadas,
             imagen=imagen
         )
+        if categorias:
+            nueva_serie.categorias.set(categorias)
         serializer = SerieSerializer(nueva_serie)
         return Response(serializer.data, status=201)
     except Exception as e:
@@ -83,8 +94,8 @@ class EpisodioViewSet(viewsets.ModelViewSet):
     ordering_fields = ['temporada', 'numero']
 
 @api_view(['GET'])
-@authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated])
+# @authentication_classes([TokenAuthentication])
+# @permission_classes([IsAuthenticated])
 def getSeries(request):
     series = Serie.objects.all()
     serializer = SerieSerializer(series, many=True)

@@ -41,8 +41,7 @@ urlpatterns = [
     path('media/upload/', upload_video),
     path('media/', mediaView),
     path('categories/', getCategories),
-    path('categories/new', newCategory, name='newCategory'),
-    
+    path('categories/new/', newCategory, name='newCategory'),
     path('series/new/',newSeries, name='new_series'),
     path('media/<path:file_path>/', protected_media, name='protected_media'),
     # path('hls/<path:file_path>/', serveHLS, name='serve_hls'),

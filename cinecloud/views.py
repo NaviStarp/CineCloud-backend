@@ -19,6 +19,9 @@ from .hls_utils import process_video
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .models import Categoria
+from .serializers import CategoriaSerializer
+from rest_framework.response import Response
+
 from .settings import AUTH_USER_MODEL as Users
 def status(request):
     return HttpResponse("OK")
@@ -150,30 +153,31 @@ def upload_video(request):
         send_progress_update(user.id, f"❌ Error durante la subida: {str(e)}", 0,"error")
         return JsonResponse({"error": str(e)}, status=400)
 
-[IsAuthenticated]
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def newCategory(request):
-    # Crea una nueva categoría de películas
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        nombre = data.get('name')
-        if not nombre:
-            return JsonResponse({"error": "No se proporcionó la categoría"}, status=400)
-        
-        # Guarda la nueva categoría en la base de datos
-        categoria = Categoria(nombre=nombre)
-        try:
-            categoria.save()
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=400)
-        return JsonResponse({"message": "Categoría creada exitosamente"})
-    else:
-        return JsonResponse({"error": "Método no permitido"}, status=405)
+    # Crea una nueva categoría
+    data = request.data
+    nombre = data.get('nombre')
 
-[IsAuthenticated]
+    if not nombre:
+        return JsonResponse({"error": "El nombre es obligatorio"}, status=400)
+
+    try:
+        categoria = Categoria(nombre=nombre)
+        categoria.save()
+        return JsonResponse({"message": "Categoría creada con éxito", "id": categoria.id}, status=201)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def getCategories(request):
     # Obtiene todas las categorías de películas
-    categories = Pelicula.objects.values_list('categorias', flat=True).distinct()
-    return JsonResponse({"categories": list(categories)})
+    categories = Categoria.objects.all()
+    serializer = CategoriaSerializer(categories, many=True)
+
+    return Response(serializer.data, status=200)
 
 [IsAuthenticated]
 def serveHLS(request, file_path):
