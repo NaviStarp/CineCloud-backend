@@ -2,44 +2,55 @@ import os
 import subprocess
 import concurrent.futures
 import json
-import re
 import sys
 
 def has_nvidia_gpu():
     """Verifica si hay una GPU NVIDIA disponible con soporte para NVENC"""
     try:
-        subprocess.run(['nvidia-smi'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        result = subprocess.run(['ffmpeg', '-encoders'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return 'h264_nvenc' in result.stdout.decode()
+        result = subprocess.run(['nvidia-smi'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output = result.stdout.decode().lower()
+        # Verificar si hay GPU NVIDIA mencionada en la salida de nvidia-smi
+        if 'nvidia' in output and ('gpu' in output or 'vulkan' in output):
+            # Verificar si ffmpeg tiene el codificador NVIDIA disponible
+            encoder_result = subprocess.run(['ffmpeg', '-encoders'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            return 'h264_nvenc' in encoder_result.stdout.decode()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
+
 def has_amd_gpu():
     """Verifica si hay una GPU AMD disponible con soporte para VCE"""
-    try:
-        subprocess.run(['lspci'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        result = subprocess.run(['ffmpeg', '-encoders'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return 'h264_amf' in result.stdout.decode()
+    try:            
+        # Verificar si hay GPU AMD mencionada en la salida de lspci
+        lspci_result = subprocess.run(['lspci'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output = lspci_result.stdout.decode().lower()
+        if 'amd' in output and ('radeon' in output or 'vega' in output or 'rx' in output):
+            # Verificar si ffmpeg tiene el codificador AMD disponible
+            encoder_result = subprocess.run(['ffmpeg', '-encoders'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            return 'h264_amf' in encoder_result.stdout.decode()
+        return False
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
 
 def get_video_encoder_settings():
     """Determina los ajustes de codificación según la disponibilidad de GPU"""
+    # Forzar la comprobación de NVIDIA primero
     if has_nvidia_gpu():
-        print("GPU NVIDIA detectada, usando aceleración por hardware")
+        print("GPU NVIDIA detectada, usando aceleración por hardware NVENC")
         return {
             'encoder': 'h264_nvenc',
             'preset': '-preset',
             'preset_value': 'p4'
         }
     elif has_amd_gpu():
-        print("GPU AMD detectada, usando aceleración por hardware")
+        print("GPU AMD detectada, usando aceleración por hardware AMF")
+        # Corregir los ajustes para AMD, el preset "medium" no es válido para AMF
         return {
             'encoder': 'h264_amf',
-            'preset': '-preset',
-            'preset_value': 'medium'
+            'preset': '-quality', 
+            'preset_value': 'balanced'  
         }
     else:
-        print("No se detectó GPU NVIDIA, usando codificación por CPU")
+        print("No se detectó GPU compatible, usando codificación por CPU")
         return {
             'encoder': 'libx264',
             'preset': '-preset',
@@ -239,17 +250,31 @@ def process_video(input_path, output_dir):
             print(f"¡Conversión completa con {len(successful_resolutions)} resoluciones generadas!")
         else:
             print("No se completó ninguna conversión exitosamente. Intentando con el video original...")
-            success, width, height, bitrate = segment_original_video(input_path, output_dir, encoder_settings)
+            
+            # Si todas las conversiones fallaron, intenta con libx264 como último recurso
+            print("Intentando con codificador CPU libx264 como respaldo")
+            backup_encoder = {
+                'encoder': 'libx264',
+                'preset': '-preset',
+                'preset_value': 'medium'
+            }
+            
+            success, width, height, bitrate = segment_original_video(input_path, output_dir, backup_encoder)
             if success:
                 create_master_playlist(output_dir, [(width, height, bitrate)])
-                print("¡Segmentación del video original completada!")
+                print("¡Segmentación del video original completada con codificador CPU!")
     except Exception as e:
         print(f"Error durante el procesamiento del video: {str(e)}")
         # Intentar procesar solo la resolución original como último recurso
         try:
             print("Intentando procesar solo la resolución original como último recurso...")
-            encoder_settings = get_video_encoder_settings()
-            success, width, height, bitrate = segment_original_video(input_path, output_dir, encoder_settings)
+            # Usar siempre libx264 en caso de emergencia
+            backup_encoder = {
+                'encoder': 'libx264',
+                'preset': '-preset',
+                'preset_value': 'medium'
+            }
+            success, width, height, bitrate = segment_original_video(input_path, output_dir, backup_encoder)
             if success:
                 create_master_playlist(output_dir, [(width, height, bitrate)])
                 print("¡Procesamiento de emergencia completado!")
@@ -262,9 +287,29 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Convertir video a HLS con múltiples resoluciones')
     parser.add_argument('input', help='Ruta del archivo de video de entrada')
     parser.add_argument('output', help='Directorio de salida para los archivos HLS')
+    parser.add_argument('--force-nvidia', action='store_true', help='Forzar uso de codificador NVIDIA')
+    parser.add_argument('--force-cpu', action='store_true', help='Forzar uso de codificador CPU')
     args = parser.parse_args()
     
     print(f"Procesando archivo: {args.input}")
     print(f"Directorio de salida: {args.output}")
     
-    process_video(args.input, args.output)
+    # Opción para forzar el uso de un codificador específico
+    if args.force_nvidia:
+        print("Forzando uso de codificador NVIDIA")
+        encoder_settings = {
+            'encoder': 'h264_nvenc',
+            'preset': '-preset',
+            'preset_value': 'p4'
+        }
+        process_video(args.input, args.output, encoder_settings)
+    elif args.force_cpu:
+        print("Forzando uso de codificador CPU")
+        encoder_settings = {
+            'encoder': 'libx264',
+            'preset': '-preset',
+            'preset_value': 'medium'
+        }
+        process_video(args.input, args.output, encoder_settings)
+    else:
+        process_video(args.input, args.output)
