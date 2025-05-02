@@ -1,6 +1,7 @@
 from django.db import models
 from django.urls import reverse
-from cinecloud.models import Categoria  
+from cinecloud.models import Categoria 
+
 class Pelicula(models.Model):
     # Fields
     titulo = models.CharField(max_length=255,unique=True)
@@ -17,6 +18,6 @@ class Pelicula(models.Model):
     
     def __str__(self):
         return self.titulo
-    
+
     def get_absolute_url(self):
         return reverse("pelicula_detail", kwargs={"pk": self.pk})

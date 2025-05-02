@@ -12,6 +12,7 @@ from django.http import JsonResponse
 from django.http import FileResponse
 from django.conf import settings
 from django.http import Http404
+from django.db.models import F
 import os
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -89,7 +90,16 @@ def upload_video(request):
                     imagen=thumbnail_path,
                     video=video_hls
                 )
+                pelicula.save()  # Save the pelicula object to assign an ID
+                categorias_raw = request.POST.get(f'videos[{index}][categorias]')
+                categorias_list = json.loads(categorias_raw) if categorias_raw else []
+                categorias = Categoria.objects.filter(nombre__in=categorias_list)
+                if categorias.exists():
+                    pelicula.categorias.add(*categorias)  # Use add() to associate categories
                 pelicula.save()
+                print("CATEGORIAS: ", categorias_list)
+                print("Categorias existentes: ", Categoria.objects.all())
+                print("CATEGORIAS DE LA PELICULA: ", pelicula.categorias.all())
                 output_dir = os.path.join(default_storage.location, f'hls/pelicula/{pelicula.titulo}')
                 send_progress_update(user.id, f"⚙️ Procesando HLS de '{name}'...", 60)
                 process_video(full_video_path,output_dir)
@@ -103,7 +113,7 @@ def upload_video(request):
                 send_progress_update(user.id, f"✅ Película '{name}' lista", 100)
 
             elif media_type == 'series':
-                serie, _ = Serie.objects.get_or_create(
+                serie, created = Serie.objects.get_or_create(
                     titulo=series_name,
                     defaults={
                         "descripcion": series_description,
@@ -112,6 +122,9 @@ def upload_video(request):
                         "imagen": thumbnail_path
                     }
                 )
+                if created:
+                    serie.categorias.set(Categoria.objects.filter(nombre__in=request.POST.getlist(f'videos[{index}][categorias]')))
+                    serie.save()
                 if Episodio.objects.filter(titulo=name, serie=serie).exists():
                     send_progress_update(user.id, f"⚠️ Episodio '{name}' ya existe. Saltando...", 25,"warning")
                     continue
@@ -174,9 +187,8 @@ def newCategory(request):
 @permission_classes([IsAuthenticated])
 def getCategories(request):
     # Obtiene todas las categorías de películas
-    categories = Categoria.objects.all()
+    categories = Categoria.objects.distinct()
     serializer = CategoriaSerializer(categories, many=True)
-
     return Response(serializer.data, status=200)
 
 [IsAuthenticated]
@@ -215,11 +227,24 @@ def send_progress_update(user_id, message, progress, status="info"):
     )
 
 def mediaView(request):
-    print("Peliculas: ", Pelicula.objects.all())
-    peliculas = list(Pelicula.objects.values())
-    series = list(Serie.objects.values())
-    episodios = list(Episodio.objects.values())
+    peliculas = list(Pelicula.objects.values('id', 'titulo', 'descripcion', 'fecha_estreno', 'duracion', 'imagen', 'video').annotate(categorias=F('categorias__nombre')).distinct())
+    peliculas = [
+        {
+            **pelicula,
+            "categorias": list(Pelicula.objects.filter(id=pelicula['id']).values_list('categorias__nombre', flat=True).distinct())
+        }
+        for pelicula in peliculas
+    ]
 
+    series = list(Serie.objects.values('id', 'titulo', 'descripcion', 'fecha_estreno', 'temporadas', 'imagen').annotate(categorias=F('categorias__nombre')).distinct())
+    series = [
+        {
+            **serie,
+            "categorias": list(Serie.objects.filter(id=serie['id']).values_list('categorias__nombre', flat=True).distinct())
+        }
+        for serie in series
+    ]
+    episodios = list(Episodio.objects.values('id', 'titulo', 'temporada', 'numero', 'descripcion', 'duracion', 'imagen', 'video').distinct())
     return JsonResponse({
         "peliculas": peliculas,
         "series": series,
