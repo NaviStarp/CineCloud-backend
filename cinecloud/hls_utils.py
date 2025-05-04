@@ -1,73 +1,99 @@
+#!/usr/bin/env python3
 import os
-import subprocess
-import concurrent.futures
-import json
 import sys
+import json
+import ffmpeg
+import concurrent.futures
+from pathlib import Path
+import subprocess
+import argparse
 
-def has_nvidia_gpu():
-    """Verifica si hay una GPU NVIDIA disponible con soporte para NVENC"""
+def detect_gpus():
+    """Detecta GPUs disponibles usando bibliotecas de Python de manera multiplataforma"""
+    gpu_info = {
+        'nvidia': False,
+        'amd': False
+    }
+    # Método 1: Verificar si GPUtil detecta GPUs
+    if not gpu_info['nvidia']:
+        try:
+            import GPUtil
+            gpus = GPUtil.getGPUs()
+            for gpu in gpus:
+                if 'nvidia' in gpu.name.lower():
+                    gpu_info['nvidia'] = True
+                    print(f"GPU NVIDIA detectada via GPUtil: {gpu.name}")
+                elif any(amd_keyword in gpu.name.lower() for amd_keyword in ['amd', 'radeon', 'vega', 'rx']):
+                    gpu_info['amd'] = True
+                    print(f"GPU AMD detectada via GPUtil: {gpu.name}")
+        except ImportError:
+            print("GPUtil no está instalado, intentando método alternativo...")
+    
+    # Si GPUtil no detectó GPUs, intentar con pynvml
+    if not gpu_info['nvidia']:
+        try:
+            import pynvml
+            pynvml.nvmlInit()
+            device_count = pynvml.nvmlDeviceGetCount()
+            if device_count > 0:
+                gpu_info['nvidia'] = True
+                handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+                print(f"GPU NVIDIA detectada via NVML: {pynvml.nvmlDeviceGetName(handle).decode()}")
+            pynvml.nvmlShutdown()
+        except ImportError:
+            print("NVML no está instalado, intentando último método...")
+    
+    # Método de último recurso: verificar si los codificadores están disponibles en ffmpeg
     try:
-        result = subprocess.run(['nvidia-smi'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        output = result.stdout.decode().lower()
-        # Verificar si hay GPU NVIDIA mencionada en la salida de nvidia-smi
-        if 'nvidia' in output and ('gpu' in output or 'vulkan' in output):
-            # Verificar si ffmpeg tiene el codificador NVIDIA disponible
-            encoder_result = subprocess.run(['ffmpeg', '-encoders'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            return 'h264_nvenc' in encoder_result.stdout.decode()
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
-
-def has_amd_gpu():
-    """Verifica si hay una GPU AMD disponible con soporte para VCE"""
-    try:            
-        # Verificar si hay GPU AMD mencionada en la salida de lspci
-        lspci_result = subprocess.run(['lspci'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        output = lspci_result.stdout.decode().lower()
-        if 'amd' in output and ('radeon' in output or 'vega' in output or 'rx' in output):
-            # Verificar si ffmpeg tiene el codificador AMD disponible
-            encoder_result = subprocess.run(['ffmpeg', '-encoders'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            return 'h264_amf' in encoder_result.stdout.decode()
-        return False
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
+        ffmpeg_encoders = subprocess.run(['ffmpeg', '-encoders'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        encoders_output = ffmpeg_encoders.stdout.decode()
+        
+        if 'h264_nvenc' in encoders_output and not gpu_info['nvidia']:
+            gpu_info['nvidia'] = True
+            print("Codificador NVIDIA detectado en ffmpeg")
+            
+        if 'h264_amf' in encoders_output and not gpu_info['amd']:
+            gpu_info['amd'] = True
+            print("Codificador AMD detectado en ffmpeg")
+    except:
+        print("No se pudo verificar codificadores disponibles en ffmpeg")
+    
+    return gpu_info
 
 def get_video_encoder_settings():
     """Determina los ajustes de codificación según la disponibilidad de GPU"""
+    gpu_info = detect_gpus()
+    
     # Forzar la comprobación de NVIDIA primero
-    if has_nvidia_gpu():
+    if gpu_info['nvidia']:
         print("GPU NVIDIA detectada, usando aceleración por hardware NVENC")
         return {
-            'encoder': 'h264_nvenc',
-            'preset': '-preset',
-            'preset_value': 'p4'
+            'codec': 'h264_nvenc',
+            'preset': 'p4'
         }
-    elif has_amd_gpu():
+    elif gpu_info['amd']:
         print("GPU AMD detectada, usando aceleración por hardware AMF")
-        # Corregir los ajustes para AMD, el preset "medium" no es válido para AMF
         return {
-            'encoder': 'h264_amf',
-            'preset': '-quality', 
-            'preset_value': 'balanced'  
+            'codec': 'h264_amf',
+            'quality': 'balanced'  # Para AMF usamos quality en lugar de preset
         }
     else:
         print("No se detectó GPU compatible, usando codificación por CPU")
         return {
-            'encoder': 'libx264',
-            'preset': '-preset',
-            'preset_value': 'medium'
+            'codec': 'libx264',
+            'preset': 'medium'
         }
 
 def get_video_resolution(input_path):
     """Obtiene la resolución original del video usando ffprobe"""
     try:
-        command = [
-            'ffprobe', '-v', 'error', '-select_streams', 'v:0', 
-            '-show_entries', 'stream=width,height', '-of', 'json', input_path
-        ]
-        result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        data = json.loads(result.stdout)
-        width = int(data['streams'][0]['width'])
-        height = int(data['streams'][0]['height'])
+        probe = ffmpeg.probe(input_path)
+        video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+        if video_stream is None:
+            raise Exception("No se encontró una pista de video en el archivo")
+            
+        width = int(video_stream['width'])
+        height = int(video_stream['height'])
         print(f"Resolución original del video: {width}x{height}")
         return width, height
     except Exception as e:
@@ -78,6 +104,24 @@ def get_video_resolution(input_path):
 def is_low_resolution(width, height):
     """Determina si el video tiene una resolución baja (menor que 480p)"""
     return height < 480 and width < 854
+
+def apply_encoder_settings(stream, encoder_settings):
+    """Aplica los ajustes del codificador a un stream de ffmpeg"""
+    # Aplicar la configuración del codificador según el tipo
+    output_args = {}
+    
+    # Configurar el codec de video
+    output_args['c:v'] = encoder_settings['codec']
+    
+    # Añadir preset o quality según el codec
+    if encoder_settings['codec'] == 'h264_nvenc':
+        output_args['preset'] = encoder_settings['preset']
+    elif encoder_settings['codec'] == 'h264_amf':
+        output_args['quality'] = encoder_settings['quality']
+    else:  # libx264
+        output_args['preset'] = encoder_settings['preset']
+    
+    return output_args
 
 def segment_original_video(input_path, output_dir, encoder_settings):
     """Divide el video original en segmentos HLS sin cambiar la resolución"""
@@ -97,24 +141,36 @@ def segment_original_video(input_path, output_dir, encoder_settings):
     else:
         bitrate = '800k'
     
-    command = [
-        'ffmpeg', '-i', input_path,
-        '-c:v', encoder_settings['encoder'], 
-        encoder_settings['preset'], encoder_settings['preset_value'],
-        '-b:v', bitrate,
-        '-c:a', 'aac', '-b:a', '128k',
-        '-f', 'hls', '-hls_time', '10', '-hls_list_size', '0',
-        '-hls_segment_filename', os.path.join(output_dir, f'{resolution_name}_%03d.ts'),
-        os.path.join(output_dir, f'{resolution_name}.m3u8')
-    ]
+    output_path = os.path.join(output_dir, f'{resolution_name}.m3u8')
+    segment_pattern = os.path.join(output_dir, f'{resolution_name}_%03d.ts')
     
-    print(f"Procesando video original en segmentos HLS de 10 segundos...")
-    print(f"Comando: {' '.join(command)}")
     try:
-        subprocess.run(command, check=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        # Configurar stream de entrada
+        stream = ffmpeg.input(input_path)
+        
+        # Obtener configuración del codificador
+        encoder_args = apply_encoder_settings(stream, encoder_settings)
+        
+        # Configurar los argumentos de salida
+        output_args = {
+            'b:v': bitrate,
+            'c:a': 'aac',
+            'b:a': '128k',
+            'f': 'hls',
+            'hls_time': '10',
+            'hls_list_size': '0',
+            'hls_segment_filename': segment_pattern,
+            **encoder_args  # Integrar los argumentos del codificador
+        }
+        
+        # Ejecutar el comando
+        print(f"Procesando video original en segmentos HLS de 10 segundos...")
+        print(f"Argumentos de salida: {output_args}")
+        
+        ffmpeg.output(stream, output_path, **output_args).run(capture_stdout=True, capture_stderr=True)
         return True, width, height, bitrate
-    except subprocess.CalledProcessError as e:
-        print(f"Error durante la segmentación: {e.stderr.decode()}")
+    except ffmpeg._run.Error as e:
+        print(f"Error durante la segmentación: {e.stderr.decode() if e.stderr else str(e)}")
         return False, width, height, bitrate
 
 def convert_to_resolution(input_path, output_dir, resolution, bitrate, encoder_settings):
@@ -123,25 +179,40 @@ def convert_to_resolution(input_path, output_dir, resolution, bitrate, encoder_s
     resolution_name = f"{height}p"
     os.makedirs(output_dir, exist_ok=True)
     
-    command = [
-        'ffmpeg', '-i', input_path,
-        '-vf', f'scale=w={width}:h={height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2',
-        '-c:v', encoder_settings['encoder'], 
-        encoder_settings['preset'], encoder_settings['preset_value'],
-        '-b:v', bitrate,
-        '-c:a', 'aac', '-b:a', '128k',
-        '-f', 'hls', '-hls_time', '10', '-hls_list_size', '0',
-        '-hls_segment_filename', os.path.join(output_dir, f'{resolution_name}_%03d.ts'),
-        os.path.join(output_dir, f'{resolution_name}.m3u8')
-    ]
+    output_path = os.path.join(output_dir, f'{resolution_name}.m3u8')
+    segment_pattern = os.path.join(output_dir, f'{resolution_name}_%03d.ts')
     
-    print(f"Procesando {resolution_name}...")
-    print(f"Comando: {' '.join(command)}")
     try:
-        subprocess.run(command, check=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        # Configurar stream de entrada
+        stream = ffmpeg.input(input_path)
+        
+        # Aplicar escala manteniendo la relación de aspecto
+        scaled_stream = stream.filter('scale', width=width, height=height, force_original_aspect_ratio='decrease')
+        padded_stream = scaled_stream.filter('pad', width=width, height=height, x='(ow-iw)/2', y='(oh-ih)/2')
+        
+        # Obtener configuración del codificador
+        encoder_args = apply_encoder_settings(padded_stream, encoder_settings)
+        
+        # Configurar los argumentos de salida
+        output_args = {
+            'b:v': bitrate,
+            'c:a': 'aac',
+            'b:a': '128k',
+            'f': 'hls',
+            'hls_time': '10',
+            'hls_list_size': '0',
+            'hls_segment_filename': segment_pattern,
+            **encoder_args  # Integrar los argumentos del codificador
+        }
+        
+        # Ejecutar el comando
+        print(f"Procesando {resolution_name}...")
+        print(f"Argumentos de salida: {output_args}")
+        
+        ffmpeg.output(padded_stream, output_path, **output_args).run(capture_stdout=True, capture_stderr=True)
         return True
-    except subprocess.CalledProcessError as e:
-        print(f"Error durante la conversión: {e.stderr.decode()}")
+    except ffmpeg.Error as e:
+        print(f"Error durante la conversión: {e.stderr.decode() if e.stderr else str(e)}")
         return False
 
 def create_master_playlist(output_dir, available_resolutions):
@@ -160,9 +231,10 @@ def create_master_playlist(output_dir, available_resolutions):
     
     os.makedirs(output_dir, exist_ok=True)
     print("Creando playlist master...")
-    with open(os.path.join(output_dir, 'playlist.m3u8'), 'w') as f:
+    playlist_path = os.path.join(output_dir, 'playlist.m3u8')
+    with open(playlist_path, 'w') as f:
         f.write(master_playlist)
-    print(f"Master playlist creado en: {os.path.join(output_dir, 'playlist.m3u8')}")
+    print(f"Master playlist creado en: {playlist_path}")
 
 def process_video(input_path, output_dir):
     """Procesa el video para las resoluciones apropiadas según la resolución original"""
@@ -210,7 +282,6 @@ def process_video(input_path, output_dir):
         # Si no hay resoluciones estándar o el video es cuadrado/vertical, procesar solo la original
         if not standard_resolutions or original_width <= original_height:
             print("Video con formato especial (cuadrado o vertical) detectado, procesando solo la resolución original")
-            original_bitrate = '3000k' if original_height >= 720 else '1000k'
             success, width, height, bitrate = segment_original_video(input_path, output_dir, encoder_settings)
             if success:
                 create_master_playlist(output_dir, [(width, height, bitrate)])
@@ -254,9 +325,8 @@ def process_video(input_path, output_dir):
             # Si todas las conversiones fallaron, intenta con libx264 como último recurso
             print("Intentando con codificador CPU libx264 como respaldo")
             backup_encoder = {
-                'encoder': 'libx264',
-                'preset': '-preset',
-                'preset_value': 'medium'
+                'codec': 'libx264',
+                'preset': 'medium'
             }
             
             success, width, height, bitrate = segment_original_video(input_path, output_dir, backup_encoder)
@@ -270,9 +340,8 @@ def process_video(input_path, output_dir):
             print("Intentando procesar solo la resolución original como último recurso...")
             # Usar siempre libx264 en caso de emergencia
             backup_encoder = {
-                'encoder': 'libx264',
-                'preset': '-preset',
-                'preset_value': 'medium'
+                'codec': 'libx264',
+                'preset': 'medium'
             }
             success, width, height, bitrate = segment_original_video(input_path, output_dir, backup_encoder)
             if success:
@@ -283,13 +352,30 @@ def process_video(input_path, output_dir):
             sys.exit(1)
 
 if __name__ == "__main__":
-    import argparse
     parser = argparse.ArgumentParser(description='Convertir video a HLS con múltiples resoluciones')
     parser.add_argument('input', help='Ruta del archivo de video de entrada')
     parser.add_argument('output', help='Directorio de salida para los archivos HLS')
     parser.add_argument('--force-nvidia', action='store_true', help='Forzar uso de codificador NVIDIA')
+    parser.add_argument('--force-amd', action='store_true', help='Forzar uso de codificador AMD')
     parser.add_argument('--force-cpu', action='store_true', help='Forzar uso de codificador CPU')
+    parser.add_argument('--install-deps', action='store_true', help='Instalar dependencias necesarias')
     args = parser.parse_args()
+    
+    # Instalación de dependencias si se solicita
+    if args.install_deps:
+        print("Instalando dependencias necesarias...")
+        try:
+            import pip
+            pip.main(['install', 'GPUtil', 'pynvml'])
+            print("Dependencias instaladas correctamente")
+        except Exception as e:
+            print(f"Error al instalar dependencias: {str(e)}")
+            print("Instalando solo dependencias esenciales...")
+            try:
+                import pip
+                pip.main(['install', 'GPUtil'])
+            except:
+                print("No se pudieron instalar dependencias. El script intentará funcionar sin ellas.")
     
     print(f"Procesando archivo: {args.input}")
     print(f"Directorio de salida: {args.output}")
@@ -298,18 +384,23 @@ if __name__ == "__main__":
     if args.force_nvidia:
         print("Forzando uso de codificador NVIDIA")
         encoder_settings = {
-            'encoder': 'h264_nvenc',
-            'preset': '-preset',
-            'preset_value': 'p4'
+            'codec': 'h264_nvenc',
+            'preset': 'p4'
         }
-        process_video(args.input, args.output, encoder_settings)
+        process_video(args.input, args.output)
+    elif args.force_amd:
+        print("Forzando uso de codificador AMD")
+        encoder_settings = {
+            'codec': 'h264_amf',
+            'quality': 'balanced'
+        }
+        process_video(args.input, args.output)
     elif args.force_cpu:
         print("Forzando uso de codificador CPU")
         encoder_settings = {
-            'encoder': 'libx264',
-            'preset': '-preset',
-            'preset_value': 'medium'
+            'codec': 'libx264',
+            'preset': 'medium'
         }
-        process_video(args.input, args.output, encoder_settings)
+        process_video(args.input, args.output)
     else:
         process_video(args.input, args.output)

@@ -131,3 +131,17 @@ def getEpisodiosPorSerie(request, pk):
     episodios = serie.episodios.all()
     serializer = EpisodioSerializer(episodios, many=True)
     return Response(serializer.data)
+
+@api_view(['GET'])
+# @authentication_classes([TokenAuthentication])
+# @permission_classes([IsAuthenticated])
+def getSerieDetails(request, pk):
+    try:
+        serie = Serie.objects.prefetch_related('categorias').get(pk=pk)
+    except Serie.DoesNotExist:
+        return Response({'error': 'Serie not found'}, status=404)
+    
+    serie_data = SerieSerializer(serie).data
+    serie_data['categorias'] = [categoria.nombre for categoria in serie.categorias.all()]
+    
+    return Response(serie_data)

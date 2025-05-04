@@ -11,7 +11,7 @@ class EpisodioSimpleSerializer(serializers.ModelSerializer):
     """Serializer simplificado para listar episodios dentro de una serie"""
     class Meta:
         model = Episodio
-        fields = ['id', 'titulo', 'temporada', 'numero', 'descripcion', 'imagen']
+        fields = ['id', 'titulo', 'temporada', 'numero', 'descripcion', 'imagen', 'duracion', 'video']
 
 
 class SerieSerializer(serializers.ModelSerializer):

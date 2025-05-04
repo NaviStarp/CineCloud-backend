@@ -9,6 +9,9 @@ from .forms import PeliculaForm
 from .serializers import (
     PeliculaSerializer, 
 )
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
 
 
 class PeliculaViewSet(viewsets.ModelViewSet):
@@ -34,3 +37,17 @@ class PeliculaViewSet(viewsets.ModelViewSet):
         else:
             form = PeliculaForm()
         return render(request, 'upload_pelicula.html', {'form': form})
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def getMovie(request, pk):
+    try:
+        pelicula = Pelicula.objects.prefetch_related('categorias').get(pk=pk)
+    except Pelicula.DoesNotExist:
+        return Response({'error': 'Pelicula not found'}, status=404)
+    
+    pelicula_data = PeliculaSerializer(pelicula).data
+    pelicula_data['categorias'] = [categoria.nombre for categoria in pelicula.categorias.all()]
+    
+    return Response(pelicula_data)
