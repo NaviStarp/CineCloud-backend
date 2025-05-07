@@ -51,3 +51,11 @@ def getMovie(request, pk):
     pelicula_data['categorias'] = [categoria.nombre for categoria in pelicula.categorias.all()]
     
     return Response(pelicula_data)
+
+@api_view(['GET'])
+# @authentication_classes([TokenAuthentication])
+# @permission_classes([IsAuthenticated])
+def getMovies(request):
+    peliculas = Pelicula.objects.all()
+    serializer = PeliculaSerializer(peliculas, many=True)
+    return Response(serializer.data)

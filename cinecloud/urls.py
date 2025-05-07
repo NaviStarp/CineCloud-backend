@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path,include
 from rest_framework.routers import DefaultRouter
 from series.views import SerieViewSet, EpisodioViewSet,getSeries,getEpisodiosPorSerie,newSeries,getSerieDetails
-from movies.views import PeliculaViewSet,getMovie
+from movies.views import PeliculaViewSet,getMovie,getMovies
 from users.views import login,signup,prueba,authenticated
 from .views import status,upload_video,mediaView,protected_media,serveHLS,getCategories,newCategory
 from django.conf import settings
@@ -45,6 +45,7 @@ urlpatterns = [
     path('series/new/',newSeries, name='new_series'),
     path('media/<path:file_path>/', protected_media, name='protected_media'),
     re_path(r'^hls/(?P<path>.*)$', serve, {'document_root': 'media/hls'}),
+    path('movies/', getMovies, name='get_movies'),
     path('movies/<int:pk>/', getMovie, name='get_movie),'),
     path('series/',getSeries, name='get_series'),
     path('series/<int:pk>/',getSerieDetails, name='serie_detail'),
