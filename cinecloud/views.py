@@ -183,6 +183,44 @@ def newCategory(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def editCategory(request, pk):
+    # Edita una categoría existente
+    try:
+        categoria = Categoria.objects.get(pk=pk)
+    except Categoria.DoesNotExist:
+        return JsonResponse({"error": "Categoría no encontrada"}, status=404)
+
+    data = request.data
+    nombre = data.get('nombre')
+
+    if not nombre:
+        return JsonResponse({"error": "El nombre es obligatorio"}, status=400)
+
+    try:
+        categoria.nombre = nombre
+        categoria.save()
+        return JsonResponse({"message": "Categoría editada con éxito"}, status=200)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+    
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def deleteCategory(request, pk):
+    # Elimina una categoría existente
+    try:
+        categoria = Categoria.objects.get(pk=pk)
+    except Categoria.DoesNotExist:
+        return JsonResponse({"error": "Categoría no encontrada"}, status=404)
+
+    try:
+        categoria.delete()
+        return JsonResponse({"message": "Categoría eliminada con éxito"}, status=200)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def getCategories(request):

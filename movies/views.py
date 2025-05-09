@@ -53,9 +53,37 @@ def getMovie(request, pk):
     return Response(pelicula_data)
 
 @api_view(['GET'])
-# @authentication_classes([TokenAuthentication])
-# @permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
 def getMovies(request):
     peliculas = Pelicula.objects.all()
     serializer = PeliculaSerializer(peliculas, many=True)
     return Response(serializer.data)
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def editMovie(request, pk):
+    try:
+        pelicula = Pelicula.objects.get(pk=pk)
+    except Pelicula.DoesNotExist:
+        return Response({'error': 'Pelicula no encontrada'}, status=404)
+    
+    serializer = PeliculaSerializer(pelicula, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    
+    return Response(serializer.errors, status=400)
+
+@api_view(['DELETE'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def deleteMovie(request, pk):
+    try:
+        pelicula = Pelicula.objects.get(pk=pk)
+    except Pelicula.DoesNotExist:
+        return Response({'error': 'Pelicula not found'}, status=404)
+    
+    pelicula.delete()
+    return Response(status=204)

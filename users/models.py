@@ -20,19 +20,37 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser, PermissionsMixin):
     username = models.CharField(max_length=50, unique=True)
-    # Campos mínimos requeridos por Django para la autenticación
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
-    
-    objects = UserManager()
-    
+    watched_movies = models.ManyToManyField(
+        'movies.Pelicula',
+        related_name='watched_by_users',
+        blank=True
+    )
+    watched_episodes = models.ManyToManyField(
+        'series.Episodio',
+        through='WatchedEpisode',
+        related_name='watched_by_users',
+        blank=True
+    )
+
     USERNAME_FIELD = 'username'
-    REQUIRED_FIELDS = []
-    
-    class Meta:
-        db_table = 'user'
-        verbose_name = 'usuario'
-        verbose_name_plural = 'usuarios'
-    
+
     def __str__(self):
         return self.username
+
+class WatchedMovie(models.Model):
+    user = models.ForeignKey('User', on_delete=models.CASCADE)
+    movie = models.ForeignKey('movies.Pelicula', on_delete=models.CASCADE)
+    progress = models.FloatField(default=0.0)
+
+    class Meta:
+        unique_together = ('user', 'movie')
+
+class WatchedEpisode(models.Model):
+    user = models.ForeignKey('User', on_delete=models.CASCADE)
+    episode = models.ForeignKey('series.Episodio', on_delete=models.CASCADE)
+    progress = models.FloatField(default=0.0)
+
+    class Meta:
+        unique_together = ('user', 'episode')

@@ -133,8 +133,8 @@ def getEpisodiosPorSerie(request, pk):
     return Response(serializer.data)
 
 @api_view(['GET'])
-# @authentication_classes([TokenAuthentication])
-# @permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
 def getSerieDetails(request, pk):
     try:
         serie = Serie.objects.prefetch_related('categorias').get(pk=pk)
@@ -145,3 +145,57 @@ def getSerieDetails(request, pk):
     serie_data['categorias'] = [categoria.nombre for categoria in serie.categorias.all()]
     
     return Response(serie_data)
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def editSerie(request, pk):
+    try:
+        serie = Serie.objects.get(pk=pk)
+    except Serie.DoesNotExist:
+        return Response({'error': 'Serie not found'}, status=404)
+    
+    serializer = SerieSerializer(serie, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=400)
+
+@api_view(['DELETE'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def deleteSerie(request, pk):
+    try:
+        serie = Serie.objects.get(pk=pk)
+    except Serie.DoesNotExist:
+        return Response({'error': 'Serie not found'}, status=404)
+    
+    serie.delete()
+    return Response(status=204)
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def editEpisode(request, pk):
+    try:
+        episodio = Episodio.objects.get(pk=pk)
+    except Episodio.DoesNotExist:
+        return Response({'error': 'Episodio no encontrado'}, status=404)
+    
+    serializer = EpisodioSerializer(episodio, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=400)
+
+@api_view(['DELETE'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def deleteEpisode(request, pk):
+    try:
+        episodio = Episodio.objects.get(pk=pk)
+    except Episodio.DoesNotExist:
+        return Response({'error': 'Episodio not found'}, status=404)
+    
+    episodio.delete()
+    return Response(status=204)

@@ -19,7 +19,7 @@ from django.urls import path,include
 from rest_framework.routers import DefaultRouter
 from series.views import SerieViewSet, EpisodioViewSet,getSeries,getEpisodiosPorSerie,newSeries,getSerieDetails
 from movies.views import PeliculaViewSet,getMovie,getMovies
-from users.views import login,signup,prueba,authenticated
+from users.views import login,signup,prueba,authenticated,isAdmin,add_watched_episode,add_watched_movie
 from .views import status,upload_video,mediaView,protected_media,serveHLS,getCategories,newCategory
 from django.conf import settings
 from django.conf.urls.static import static
@@ -27,16 +27,14 @@ from django.urls import re_path
 from django.views.static import serve
 
 router = DefaultRouter()
-router.register(r'peliculas', PeliculaViewSet)
-router.register(r'series', SerieViewSet)
-router.register(r'episodios', EpisodioViewSet)
+
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include(router.urls)),
     path('signup/', signup),
     path('login/', login),
     path('prueba/', prueba),
     path('token/test/',authenticated ),
+    path('isAdmin/', isAdmin),
     path('status/',status),
     path('media/upload/', upload_video),
     path('media/', mediaView),
@@ -47,7 +45,9 @@ urlpatterns = [
     re_path(r'^hls/(?P<path>.*)$', serve, {'document_root': 'media/hls'}),
     path('movies/', getMovies, name='get_movies'),
     path('movies/<int:pk>/', getMovie, name='get_movie),'),
+    path('movies/save/', add_watched_movie, name='save_movie'),
     path('series/',getSeries, name='get_series'),
     path('series/<int:pk>/',getSerieDetails, name='serie_detail'),
     path('series/<int:pk>/episodios/', getEpisodiosPorSerie, name='get_episodios_por_serie'),
+    path('episodes/save/', add_watched_episode, name='save_episode'),
 ]
