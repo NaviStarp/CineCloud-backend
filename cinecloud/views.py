@@ -15,7 +15,7 @@ from django.http import Http404
 from django.db.models import F
 import os
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,IsAdminUser
 from .hls_utils import process_video
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -28,7 +28,7 @@ def status(request):
     return HttpResponse("OK")
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated,IsAdminUser])
 def upload_video(request):
     user = request.user        
     try:            

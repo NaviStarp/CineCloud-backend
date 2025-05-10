@@ -10,7 +10,7 @@ from .serializers import (
     PeliculaSerializer, 
 )
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,IsAdminUser
 from rest_framework.authentication import TokenAuthentication
 
 
@@ -21,22 +21,6 @@ class PeliculaViewSet(viewsets.ModelViewSet):
     filterset_fields = ['fecha_estreno']
     search_fields = ['titulo', 'descripcion']
     ordering_fields = ['titulo', 'fecha_estreno', 'duracion']
-    @action(detail=False, methods=['post'])
-    def upload_pelicula(self, request):
-        serializer = PeliculaSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=201)
-        return Response(serializer.errors, status=400)
-    def upload_pelicula_view(request):
-        if request.method == 'POST':
-            form = PeliculaForm(request.POST, request.FILES)
-            if form.is_valid():
-                form.save()
-                return HttpResponseRedirect('/success/')
-        else:
-            form = PeliculaForm()
-        return render(request, 'upload_pelicula.html', {'form': form})
 
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])
@@ -61,7 +45,7 @@ def getMovies(request):
     return Response(serializer.data)
 
 @api_view(['POST'])
-@authentication_classes([TokenAuthentication])
+@authentication_classes([TokenAuthentication,IsAdminUser])
 @permission_classes([IsAuthenticated])
 def editMovie(request, pk):
     try:
@@ -78,7 +62,7 @@ def editMovie(request, pk):
 
 @api_view(['DELETE'])
 @authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated,IsAdminUser])
 def deleteMovie(request, pk):
     try:
         pelicula = Pelicula.objects.get(pk=pk)

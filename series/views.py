@@ -10,7 +10,7 @@ from .serializers import (
 )
 import json
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,IsAdminUser
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import authentication_classes
 from cinecloud.models import Categoria
@@ -148,7 +148,7 @@ def getSerieDetails(request, pk):
 
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated,IsAdminUser])
 def editSerie(request, pk):
     try:
         serie = Serie.objects.get(pk=pk)
@@ -163,7 +163,7 @@ def editSerie(request, pk):
 
 @api_view(['DELETE'])
 @authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated,IsAdminUser])
 def deleteSerie(request, pk):
     try:
         serie = Serie.objects.get(pk=pk)
@@ -175,7 +175,7 @@ def deleteSerie(request, pk):
 
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated,IsAdminUser])
 def editEpisode(request, pk):
     try:
         episodio = Episodio.objects.get(pk=pk)
@@ -190,7 +190,7 @@ def editEpisode(request, pk):
 
 @api_view(['DELETE'])
 @authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated,IsAdminUser])
 def deleteEpisode(request, pk):
     try:
         episodio = Episodio.objects.get(pk=pk)

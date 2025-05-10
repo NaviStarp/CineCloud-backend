@@ -6,12 +6,14 @@ class UserManager(BaseUserManager):
     def create_user(self, username, password=None):
         if not username:
             raise ValueError('El nombre de usuario es obligatorio')
+        username = username.lower()
         user = self.model(username=username)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
     def create_superuser(self, username, password=None):
+        username= username.lower()
         user = self.create_user(username, password)
         user.is_staff = True
         user.is_superuser = True
@@ -24,8 +26,6 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     
-    # Eliminamos watched_movies aquí ya que usamos la relación WatchedMovie
-    # Eliminamos watched_episodes aquí ya que usamos la relación WatchedEpisode
     
     objects = UserManager()
     
