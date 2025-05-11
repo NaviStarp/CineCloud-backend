@@ -1,10 +1,6 @@
-#!/usr/bin/env python3
 import os
-import sys
-import json
 import ffmpeg
 import concurrent.futures
-from pathlib import Path
 import subprocess
 import argparse
 
@@ -186,8 +182,12 @@ def convert_to_resolution(input_path, output_dir, resolution, bitrate, encoder_s
         # Configurar stream de entrada
         stream = ffmpeg.input(input_path)
         
-        # Aplicar escala manteniendo la relación de aspecto
-        scaled_stream = stream.filter('scale', width=width, height=height, force_original_aspect_ratio='decrease')
+        # Separar los streams de video y audio
+        video_stream = stream.video
+        audio_stream = stream.audio
+        
+        # Aplicar escala manteniendo la relación de aspecto (solo al video)
+        scaled_stream = video_stream.filter('scale', width=width, height=height, force_original_aspect_ratio='decrease')
         padded_stream = scaled_stream.filter('pad', width=width, height=height, x='(ow-iw)/2', y='(oh-ih)/2')
         
         # Obtener configuración del codificador
@@ -205,11 +205,8 @@ def convert_to_resolution(input_path, output_dir, resolution, bitrate, encoder_s
             **encoder_args  # Integrar los argumentos del codificador
         }
         
-        # Ejecutar el comando
-        print(f"Procesando {resolution_name}...")
-        print(f"Argumentos de salida: {output_args}")
         
-        ffmpeg.output(padded_stream, output_path, **output_args).run(capture_stdout=True, capture_stderr=True)
+        ffmpeg.output(padded_stream, audio_stream, output_path, **output_args).run(capture_stdout=True, capture_stderr=True)
         return True
     except ffmpeg.Error as e:
         print(f"Error durante la conversión: {e.stderr.decode() if e.stderr else str(e)}")
@@ -236,120 +233,89 @@ def create_master_playlist(output_dir, available_resolutions):
         f.write(master_playlist)
     print(f"Master playlist creado en: {playlist_path}")
 
-def process_video(input_path, output_dir):
+def process_video(input_path, output_dir, rescale):
     """Procesa el video para las resoluciones apropiadas según la resolución original"""
     try:
         os.makedirs(output_dir, exist_ok=True)
-        
         # Obtener la resolución original del video
         original_width, original_height = get_video_resolution(input_path)
-        
         # Obtener la configuración del codificador
         encoder_settings = get_video_encoder_settings()
         
         # Verificar si es un video de baja resolución
         if is_low_resolution(original_width, original_height):
-            print("Video de baja resolución detectado. Solo se segmentará sin cambiar la resolución.")
             success, width, height, bitrate = segment_original_video(input_path, output_dir, encoder_settings)
             if success:
                 # Crear master playlist con la única resolución disponible
                 create_master_playlist(output_dir, [(width, height, bitrate)])
                 print("¡Segmentación del video original completada!")
+            else:
+                raise Exception("Error al segmentar el video de baja resolución.")
             return
-        
+            
         # Definir las resoluciones estándar y sus bitrates para videos normales
         standard_resolutions = []
+        print("Rescalado activado" if rescale else "Rescalado desactivado")
         
         # Agregar resoluciones basadas en la resolución original
-        if original_height >= 1080:
+        if original_height >= 1080 and rescale:
             standard_resolutions.extend([
                 (1920, 1080, '5000k'),
                 (1280, 720, '3000k'),
                 (854, 480, '1000k')
             ])
-        elif original_height >= 720:
+        elif original_height >= 720 and rescale:
             standard_resolutions.extend([
                 (1280, 720, '3000k'),
                 (854, 480, '1000k')
             ])
-        elif original_height >= 480:
+        elif original_height >= 480 and rescale:
             standard_resolutions.append(
                 (854, 480, '1000k')
             )
-        
-        print(f"Resoluciones estándar a procesar: {standard_resolutions}")
-        
+            
         # Si no hay resoluciones estándar o el video es cuadrado/vertical, procesar solo la original
         if not standard_resolutions or original_width <= original_height:
-            print("Video con formato especial (cuadrado o vertical) detectado, procesando solo la resolución original")
             success, width, height, bitrate = segment_original_video(input_path, output_dir, encoder_settings)
             if success:
                 create_master_playlist(output_dir, [(width, height, bitrate)])
-                print("¡Segmentación del video original completada!")
+            else:
+                raise Exception("Error al segmentar el video con formato especial.")
             return
-        
+            
         # Ejecutar conversiones en paralelo
-        print("Iniciando procesamiento de múltiples resoluciones...")
         successful_resolutions = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             futures = []
             for width, height, bitrate in standard_resolutions:
-                print(f"Iniciando conversión a {width}x{height} con bitrate {bitrate}")
                 future = executor.submit(
-                    convert_to_resolution, 
-                    input_path, 
-                    output_dir, 
-                    (width, height), 
-                    bitrate, 
+                    convert_to_resolution,
+                    input_path,
+                    output_dir,
+                    (width, height),
+                    bitrate,
                     encoder_settings
                 )
                 futures.append((future, (width, height, bitrate)))
-            
+                
             # Esperar a que todas las conversiones terminen
             for future, resolution in futures:
                 try:
                     success = future.result()
                     if success:
                         successful_resolutions.append(resolution)
-                        print(f"Conversión exitosa a resolución: {resolution[0]}x{resolution[1]}")
                 except Exception as e:
                     print(f"Una conversión falló: {str(e)}")
-        
+                    
         # Crear el archivo master playlist con las resoluciones que fueron convertidas exitosamente
         if successful_resolutions:
             create_master_playlist(output_dir, successful_resolutions)
-            print(f"¡Conversión completa con {len(successful_resolutions)} resoluciones generadas!")
         else:
-            print("No se completó ninguna conversión exitosamente. Intentando con el video original...")
+            raise Exception("No se completó ninguna conversión exitosamente.")
             
-            # Si todas las conversiones fallaron, intenta con libx264 como último recurso
-            print("Intentando con codificador CPU libx264 como respaldo")
-            backup_encoder = {
-                'codec': 'libx264',
-                'preset': 'medium'
-            }
-            
-            success, width, height, bitrate = segment_original_video(input_path, output_dir, backup_encoder)
-            if success:
-                create_master_playlist(output_dir, [(width, height, bitrate)])
-                print("¡Segmentación del video original completada con codificador CPU!")
     except Exception as e:
         print(f"Error durante el procesamiento del video: {str(e)}")
-        # Intentar procesar solo la resolución original como último recurso
-        try:
-            print("Intentando procesar solo la resolución original como último recurso...")
-            # Usar siempre libx264 en caso de emergencia
-            backup_encoder = {
-                'codec': 'libx264',
-                'preset': 'medium'
-            }
-            success, width, height, bitrate = segment_original_video(input_path, output_dir, backup_encoder)
-            if success:
-                create_master_playlist(output_dir, [(width, height, bitrate)])
-                print("¡Procesamiento de emergencia completado!")
-        except Exception as final_error:
-            print(f"Error fatal durante el procesamiento: {str(final_error)}")
-            sys.exit(1)
+        raise  # Relanzar la excepción para que sea manejada por el llamador
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Convertir video a HLS con múltiples resoluciones')

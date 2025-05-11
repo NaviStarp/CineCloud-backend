@@ -36,7 +36,14 @@ def upload_video(request):
         for key in request.POST:
             if key.startswith('videos[') and '][name]' in key:
                 video_count = max(video_count, int(key.split('[')[1].split(']')[0]) + 1)
-        
+            if key.startswith('rescale'):
+                rescale = request.POST.get(key)
+                print("RESCALE: ", rescale)
+                print("TIPO DE RESCALE: ", type(rescale))
+                if rescale == 'true':
+                    rescale = True
+                else:
+                    rescale = False
         for index in range(video_count):
             name = request.POST.get(f'videos[{index}][name]')
             description = request.POST.get(f'videos[{index}][description]')
@@ -54,7 +61,7 @@ def upload_video(request):
             if not video_file or not name:
                 continue
             if not duration:
-                duration = 90
+                duration = 0
 
             send_progress_update(user.id, f"📥 Recibiendo video '{name}'...", 5)
             
@@ -102,14 +109,7 @@ def upload_video(request):
                 print("CATEGORIAS DE LA PELICULA: ", pelicula.categorias.all())
                 output_dir = os.path.join(default_storage.location, f'hls/pelicula/{pelicula.titulo}')
                 send_progress_update(user.id, f"⚙️ Procesando HLS de '{name}'...", 60)
-                process_video(full_video_path,output_dir)
-                # send_progress_update(user.id, f"⚙️ Convirtiendo a 480p '{name}'...", 70)
-                # convert_to_480p(full_video_path, output_dir)
-                # send_progress_update(user.id, f"⚙️ Convirtiendo a 720p '{name}'...", 80)
-                # convert_to_720p(full_video_path, output_dir)
-                # send_progress_update(user.id, f"⚙️ Convirtiendo a 1080p '{name}'...", 85)
-                # convert_to_1080p(full_video_path, output_dir)
-                # send_progress_update(user.id, f"⚙️ Creando playlist master de '{name}'...", 90)
+                process_video(full_video_path,output_dir,rescale)
                 send_progress_update(user.id, f"✅ Película '{name}' lista", 100)
 
             elif media_type == 'series':
@@ -145,15 +145,15 @@ def upload_video(request):
                 episodio.save()
                 send_progress_update(user.id, f"⚙️ Creando playlist master de '{name}'...", 35)
                 send_progress_update(user.id, f"⚙️ Procesando HLS de episodio '{name}'...", 40)
-
-                output_dir = os.path.join(default_storage.location, f'hls/serie/{serie.titulo}/{episodio.titulo}')
-                process_video(full_video_path,output_dir)
-                # send_progress_update(user.id, f"⚙️ Convirtiendo a 480p '{name}'...", 70)
-                # convert_to_480p(full_video_path, output_dir)
-                # send_progress_update(user.id, f"⚙️ Convirtiendo a 720p '{name}'...", 80)
-                # convert_to_720p(full_video_path, output_dir)
-                # send_progress_update(user.id, f"⚙️ Convirtiendo a 1080p '{name}'...", 90)
-                # convert_to_1080p(full_video_path, output_dir)
+                try:
+                    output_dir = os.path.join(default_storage.location, f'hls/serie/{serie.titulo}/{episodio.titulo}')
+                    process_video(full_video_path,output_dir,rescale)
+                except Exception as e:
+                    from django.db import transaction
+                    print(f"Error al procesar el video: {e}")
+                    transaction.rollback()
+                    send_progress_update(user.id, f"❌ Error al procesar el video: {e}", 0,"error")
+                    continue
                 send_progress_update(user.id, f"✅ Episodio '{name}' procesado correctamente", 100)
 
         clean_videos()
