@@ -22,7 +22,7 @@ def detect_gpus():
                 elif any(amd_keyword in gpu.name.lower() for amd_keyword in ['amd', 'radeon', 'vega', 'rx']):
                     gpu_info['amd'] = True
                     print(f"GPU AMD detectada via GPUtil: {gpu.name}")
-        except ImportError:
+        except Exception:
             print("GPUtil no está instalado, intentando método alternativo...")
     
     # Si GPUtil no detectó GPUs, intentar con pynvml
@@ -36,7 +36,7 @@ def detect_gpus():
                 handle = pynvml.nvmlDeviceGetHandleByIndex(0)
                 print(f"GPU NVIDIA detectada via NVML: {pynvml.nvmlDeviceGetName(handle).decode()}")
             pynvml.nvmlShutdown()
-        except ImportError:
+        except Exception:
             print("NVML no está instalado, intentando último método...")
     
     # Método de último recurso: verificar si los codificadores están disponibles en ffmpeg
@@ -338,7 +338,7 @@ if __name__ == "__main__":
             print(f"Error al instalar dependencias: {str(e)}")
             print("Instalando solo dependencias esenciales...")
             try:
-                import pip
+                import pipButton
                 pip.main(['install', 'GPUtil'])
             except:
                 print("No se pudieron instalar dependencias. El script intentará funcionar sin ellas.")
