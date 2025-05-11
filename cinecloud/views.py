@@ -22,8 +22,12 @@ from asgiref.sync import async_to_sync
 from .models import Categoria
 from .serializers import CategoriaSerializer
 from rest_framework.response import Response
-
+from django.core.signing import TimestampSigner, BadSignature
+import time
 from .settings import AUTH_USER_MODEL as Users
+from django.urls import reverse
+from django.utils.http import urlencode
+
 def status(request):
     return HttpResponse("OK")
 
@@ -290,13 +294,39 @@ def mediaView(request):
     })
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def protected_media(request, file_path):
-    # Construye la ruta completa al archivo en la carpeta media
-    file_path = os.path.join(settings.MEDIA_ROOT, file_path)
-    # Verifica si el archivo existe
+def signed_media(request):
+    path = request.GET.get('path')
+    expires = request.GET.get('expires')
+    signature = request.GET.get('signature')
+
+    if not all([path, expires, signature]):
+        raise Http404("Parámetros inválidos.")
+
+    try:
+        expected = f"{path}:{expires}"
+        signer = TimestampSigner()
+        signer.unsign(signature, max_age=int(expires) - int(time.time()))
+    except BadSignature:
+        raise Http404("Firma inválida o expirada.")
+
+    file_path = os.path.join(settings.MEDIA_ROOT, path)
     if not os.path.exists(file_path):
         raise Http404("Archivo no encontrado.")
-    
-    # Sirve el archivo
+
     return FileResponse(open(file_path, 'rb'))
+
+@api_view(['GET'])
+def get_signed_url(request, file_path):
+    expiry_seconds = int(request.GET.get('expiry_seconds', 3600))
+    signer = TimestampSigner()
+    expires = int(time.time()) + expiry_seconds
+    value = f"{file_path}:{expires}"
+    signature = signer.sign(value)
+    
+    url = reverse('signed_media')
+    query = urlencode({
+        'path': file_path,
+        'expires': expires,
+        'signature': signature,
+    })
+    return JsonResponse({"signed_url": f"{url}?{query}"})

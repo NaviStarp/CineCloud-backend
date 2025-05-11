@@ -14,6 +14,8 @@ from rest_framework.permissions import IsAuthenticated,IsAdminUser
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import authentication_classes
 from cinecloud.models import Categoria
+import os
+from django.conf import settings
 
 
 @api_view(['POST'])
@@ -171,6 +173,16 @@ def deleteSerie(request, pk):
         return Response({'error': 'Serie not found'}, status=404)
     
     serie.delete()
+    # Borrar el hls
+    hls_path = os.path.join(settings.MEDIA_ROOT, 'hls', 'serie', str(serie.titulo))
+    print(hls_path)
+    if os.path.exists(hls_path) and os.path.isdir(hls_path):
+        for root, dirs, files in os.walk(hls_path, topdown=False):
+            for file in files:
+                os.remove(os.path.join(root, file))
+            for dir in dirs:
+                os.rmdir(os.path.join(root, dir))
+        os.rmdir(hls_path)
     return Response(status=204)
 
 @api_view(['POST'])
@@ -198,4 +210,13 @@ def deleteEpisode(request, pk):
         return Response({'error': 'Episodio not found'}, status=404)
     
     episodio.delete()
+    hls_path = os.path.join(settings.MEDIA_ROOT, 'hls', episodio.serie.titulo, str(episodio.titulo))
+    print(hls_path)
+    if os.path.exists(hls_path) and os.path.isdir(hls_path):
+        for root, dirs, files in os.walk(hls_path, topdown=False):
+            for file in files:
+                os.remove(os.path.join(root, file))
+            for dir in dirs:
+                os.rmdir(os.path.join(root, dir))
+        os.rmdir(hls_path)
     return Response(status=204)

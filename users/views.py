@@ -112,6 +112,7 @@ def getWatchedEpisode(request, episode_id):
         serializer = WatchedEpisodeSerializer(watched_episode)
         return Response(serializer.data)
     except WatchedEpisode.DoesNotExist:
+        print(WatchedEpisode.objects.filter(user=user))
         return Response({'error': 'No se encontró el episodio visto'}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['POST'])
@@ -156,4 +157,9 @@ def add_watched_episode(request):
     watched_episode, created = WatchedEpisode.objects.get_or_create(user=user, episode=episode)
     watched_episode.progress = progress
     watched_episode.save()    
+    print(watched_episode.progress)
+    print(watched_episode.episode.titulo)
+    print(watched_episode.episode.serie.titulo)
+    print(watched_episode.user.username)
+    print(watched_episode.user.id)
     return Response({'message': 'Progreso de episodio guardado'}, status=status.HTTP_201_CREATED)

@@ -12,7 +12,8 @@ from .serializers import (
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated,IsAdminUser
 from rest_framework.authentication import TokenAuthentication
-
+import os
+from django.conf import settings
 
 class PeliculaViewSet(viewsets.ModelViewSet):
     queryset = Pelicula.objects.all()
@@ -70,4 +71,14 @@ def deleteMovie(request, pk):
         return Response({'error': 'Pelicula not found'}, status=404)
     
     pelicula.delete()
+    # Borrar el hls 
+    hls_path = os.path.join(settings.MEDIA_ROOT, 'hls','pelicula', str(pelicula.titulo))
+    print(hls_path)
+    if os.path.exists(hls_path) and os.path.isdir(hls_path):
+        for root, dirs, files in os.walk(hls_path, topdown=False):
+            for file in files:
+                os.remove(os.path.join(root, file))
+            for dir in dirs:
+                os.rmdir(os.path.join(root, dir))
+        os.rmdir(hls_path)
     return Response(status=204)

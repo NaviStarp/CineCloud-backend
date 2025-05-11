@@ -17,10 +17,10 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from rest_framework.routers import DefaultRouter
-from series.views import getSeries,getEpisodiosPorSerie,newSeries,getSerieDetails
-from movies.views import getMovie,getMovies
+from series.views import getSeries,getEpisodiosPorSerie,newSeries,getSerieDetails,deleteSerie
+from movies.views import getMovie,getMovies,deleteMovie
 from users.views import login,signup,prueba,authenticated,isAdmin,add_watched_episode,add_watched_movie,watchedMovies,watchedEpisodes,getWatchedEpisode,getWatchedMovie
-from .views import status,upload_video,mediaView,protected_media,getCategories,newCategory
+from .views import status,upload_video,mediaView,signed_media,getCategories,newCategory,get_signed_url
 from django.conf import settings
 from django.urls import re_path
 from django.views.static import serve
@@ -40,17 +40,20 @@ urlpatterns = [
     path('categories/', getCategories),
     path('categories/new/', newCategory, name='newCategory'),
     path('series/new/',newSeries, name='new_series'),
-    path('media/<path:file_path>/', protected_media, name='protected_media'),
+    path('media-signed/', signed_media, name='signed_media'),
+    path('get-signed-url/<path:file_path>/', get_signed_url, name='get_signed_url'),
     re_path(r'^hls/(?P<path>.*)$', serve, {'document_root': 'media/hls'}),
     path('movies/', getMovies, name='get_movies'),
     path('movies/<int:pk>/', getMovie, name='get_movie),'),
     path('movies/progress/', watchedMovies, name='get_movies'),
     path('movies/progress/<int:movie_id>/', getWatchedMovie, name='get_watched_movie'),
+    path('movies/delete/<int:pk>/', deleteMovie, name='delete_movie'),
     path('movies/progress/save/', add_watched_movie, name='save_movie'),
     path('series/',getSeries, name='get_series'),
     path('series/progress/<int:episode_id>/', getWatchedEpisode, name='get_episodes'),
     path('series/progress/', watchedEpisodes, name='get_episodes_progress'),
     path('series/<int:pk>/',getSerieDetails, name='get_serie_details'),
+    path('series/delete/<int:pk>/', deleteSerie, name='delete_serie'),
     path('series/progress/save/', add_watched_episode, name='save_episode'),
     path('series/<int:pk>/episodios/', getEpisodiosPorSerie, name='get_episodios_por_serie'),
 ]
