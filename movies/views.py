@@ -3,6 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Pelicula
+import json
+from cinecloud.models import Categoria
 from django.shortcuts import render
 from django.http import HttpResponseRedirect
 from .forms import PeliculaForm
@@ -46,20 +48,44 @@ def getMovies(request):
     return Response(serializer.data)
 
 @api_view(['POST'])
-@authentication_classes([TokenAuthentication,IsAdminUser])
-@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated, IsAdminUser])
 def editMovie(request, pk):
     try:
         pelicula = Pelicula.objects.get(pk=pk)
     except Pelicula.DoesNotExist:
-        return Response({'error': 'Pelicula no encontrada'}, status=404)
-    
-    serializer = PeliculaSerializer(pelicula, data=request.data, partial=True)
+        return Response({'error': 'Pelicula not found'}, status=404)
+
+    data = request.data
+    categorias = data.get('categorias')
+
+    if categorias:
+        if isinstance(categorias, str):
+            try:
+                categorias = json.loads(categorias)
+            except json.JSONDecodeError:
+                return Response({"error": "Invalid category format"}, status=400)
+
+        categorias = [categoria.strip() for categoria in categorias]
+        categorias_obj = Categoria.objects.filter(nombre__in=categorias)
+
+        if categorias_obj.count() != len(set(categorias)):
+            return Response({"error": "One or more categories do not exist"}, status=400)
+
+    imagen = request.FILES.get('imagen')
+    if imagen and pelicula.imagen and hasattr(pelicula.imagen, 'path') and os.path.isfile(pelicula.imagen.path):
+        os.remove(pelicula.imagen.path)
+        pelicula.imagen = imagen
+
+    serializer = PeliculaSerializer(pelicula, data=data, partial=True)
     if serializer.is_valid():
+        if categorias:
+            serializer.validated_data['categorias'] = categorias_obj
         serializer.save()
         return Response(serializer.data)
-    
+
     return Response(serializer.errors, status=400)
+
 
 @api_view(['DELETE'])
 @authentication_classes([TokenAuthentication])

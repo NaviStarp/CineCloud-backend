@@ -338,7 +338,7 @@ if __name__ == "__main__":
             print(f"Error al instalar dependencias: {str(e)}")
             print("Instalando solo dependencias esenciales...")
             try:
-                import pipButton
+                import pip
                 pip.main(['install', 'GPUtil'])
             except:
                 print("No se pudieron instalar dependencias. El script intentará funcionar sin ellas.")

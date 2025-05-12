@@ -150,17 +150,41 @@ def getSerieDetails(request, pk):
 
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated,IsAdminUser])
+@permission_classes([IsAuthenticated, IsAdminUser])
 def editSerie(request, pk):
     try:
         serie = Serie.objects.get(pk=pk)
     except Serie.DoesNotExist:
         return Response({'error': 'Serie not found'}, status=404)
-    
-    serializer = SerieSerializer(serie, data=request.data, partial=True)
+
+    data = request.data
+    categorias = data.get('categorias')
+
+    if categorias:
+        if isinstance(categorias, str):
+            try:
+                categorias = json.loads(categorias)
+            except json.JSONDecodeError:
+                return Response({"error": "Invalid category format"}, status=400)
+
+        categorias = [categoria.strip() for categoria in categorias]
+        categorias_obj = Categoria.objects.filter(nombre__in=categorias)
+
+        if categorias_obj.count() != len(set(categorias)):
+            return Response({"error": "One or more categories do not exist"}, status=400)
+
+    imagen = request.FILES.get('imagen')
+    if imagen and serie.imagen and hasattr(serie.imagen, 'path') and os.path.isfile(serie.imagen.path):
+        os.remove(serie.imagen.path)
+        serie.imagen = imagen
+
+    serializer = SerieSerializer(serie, data=data, partial=True)
     if serializer.is_valid():
+        if categorias:
+            serializer.validated_data['categorias'] = categorias_obj
         serializer.save()
         return Response(serializer.data)
+
     return Response(serializer.errors, status=400)
 
 @api_view(['DELETE'])
