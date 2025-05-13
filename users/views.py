@@ -5,13 +5,15 @@ from rest_framework import status
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 from .serializers import UserSerializer, WatchedMovieSerializer, WatchedEpisodeSerializer
-from django.contrib.auth.models import User
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import authentication_classes
 from movies.models import Pelicula
 from series.models import Episodio
 from .models import WatchedMovie, WatchedEpisode
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -71,6 +73,16 @@ def isAdmin(request):
         return Response(user.is_superuser)
     else:
         return Response(False)
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def getAdministrators(request):
+    users = User.objects.filter(is_superuser=True)
+    users = users.exclude(username='admin')
+    users = users.exclude(id=request.user.id)
+    serializer = UserSerializer(users, many=True)
+    return Response(serializer.data)
     
 @api_view(['GET'])
 @authentication_classes([TokenAuthentication])

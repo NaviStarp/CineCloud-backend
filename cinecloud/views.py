@@ -226,7 +226,6 @@ def deleteCategory(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
 def getCategories(request):
     # Obtiene todas las categorías de películas
     categories = Categoria.objects.distinct()

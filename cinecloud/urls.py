@@ -19,7 +19,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 from series.views import getSeries,getEpisodiosPorSerie,newSeries,getSerieDetails,deleteSerie,editSerie
 from movies.views import getMovie,getMovies,deleteMovie,editMovie
-from users.views import login,signup,prueba,authenticated,isAdmin,add_watched_episode,add_watched_movie,watchedMovies,watchedEpisodes,getWatchedEpisode,getWatchedMovie
+from users.views import login,signup,prueba,authenticated,isAdmin,getAdministrators,add_watched_episode,add_watched_movie,watchedMovies,watchedEpisodes,getWatchedEpisode,getWatchedMovie
 from .views import status,upload_video,mediaView,signed_media,getCategories,newCategory,get_signed_url
 from django.conf import settings
 from django.urls import re_path
@@ -34,6 +34,7 @@ urlpatterns = [
     path('prueba/', prueba),
     path('token/test/',authenticated ),
     path('isAdmin/', isAdmin),
+    path('administrators/get', getAdministrators),
     path('status/',status),
     path('media/upload/', upload_video),
     path('media/', mediaView),
