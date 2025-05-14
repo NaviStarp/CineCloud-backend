@@ -19,8 +19,8 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 from series.views import getSeries,getEpisodiosPorSerie,newSeries,getSerieDetails,deleteSerie,editSerie
 from movies.views import getMovie,getMovies,deleteMovie,editMovie
-from users.views import login,signup,prueba,authenticated,isAdmin,getAdministrators,add_watched_episode,add_watched_movie,watchedMovies,watchedEpisodes,getWatchedEpisode,getWatchedMovie
-from .views import status,upload_video,mediaView,signed_media,getCategories,newCategory,get_signed_url
+from users.views import login,signup,prueba,authenticated,isAdmin,deleteUser,createAdmin,editUser,getAdministrators,add_watched_episode,add_watched_movie,watchedMovies,watchedEpisodes,getWatchedEpisode,getWatchedMovie
+from .views import status,upload_video,mediaView,signed_media,getCategories,newCategory,get_signed_url,editCategory,deleteCategory
 from django.conf import settings
 from django.urls import re_path
 from django.views.static import serve
@@ -34,12 +34,17 @@ urlpatterns = [
     path('prueba/', prueba),
     path('token/test/',authenticated ),
     path('isAdmin/', isAdmin),
-    path('administrators/get', getAdministrators),
+    path('administrators/get/', getAdministrators),
+    path('administrators/new/', createAdmin),
     path('status/',status),
     path('media/upload/', upload_video),
     path('media/', mediaView),
     path('categories/', getCategories),
+    path('users/edit/<str:id>/', editUser, name='edit_user'),
+    path('users/delete/<str:id>/', deleteUser, name='delete_user'),
     path('categories/new/', newCategory, name='newCategory'),
+    path('categories/edit/<str:id>/', editCategory, name='get_category'),
+    path('categories/delete/<str:id>/', deleteCategory, name='delete_category'),
     path('series/new/',newSeries, name='new_series'),
     path('media-signed/', signed_media, name='signed_media'),
     path('get-signed-url/<path:file_path>/', get_signed_url, name='get_signed_url'),

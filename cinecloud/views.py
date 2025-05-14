@@ -171,7 +171,7 @@ def upload_video(request):
         return JsonResponse({"error": str(e)}, status=400)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated,IsAdminUser])
 def newCategory(request):
     # Crea una nueva categoría
     data = request.data
@@ -188,11 +188,11 @@ def newCategory(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def editCategory(request, pk):
+@permission_classes([IsAuthenticated,IsAdminUser])
+def editCategory(request, id):
     # Edita una categoría existente
     try:
-        categoria = Categoria.objects.get(pk=pk)
+        categoria = Categoria.objects.get(id=id)
     except Categoria.DoesNotExist:
         return JsonResponse({"error": "Categoría no encontrada"}, status=404)
 
@@ -208,13 +208,13 @@ def editCategory(request, pk):
         return JsonResponse({"message": "Categoría editada con éxito"}, status=200)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-    
+
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def deleteCategory(request, pk):
+@permission_classes([IsAuthenticated,IsAdminUser])
+def deleteCategory(request, id):
     # Elimina una categoría existente
     try:
-        categoria = Categoria.objects.get(pk=pk)
+        categoria = Categoria.objects.get(id=id)
     except Categoria.DoesNotExist:
         return JsonResponse({"error": "Categoría no encontrada"}, status=404)
 
@@ -230,6 +230,18 @@ def getCategories(request):
     # Obtiene todas las categorías de películas
     categories = Categoria.objects.distinct()
     serializer = CategoriaSerializer(categories, many=True)
+    return Response(serializer.data, status=200)
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def getCategory(request, pk):
+    # Obtiene una categoría específica
+    try:
+        categoria = Categoria.objects.get(pk=pk)
+    except Categoria.DoesNotExist:
+        return JsonResponse({"error": "Categoría no encontrada"}, status=404)
+
+    serializer = CategoriaSerializer(categoria)
     return Response(serializer.data, status=200)
 
 [IsAuthenticated]
