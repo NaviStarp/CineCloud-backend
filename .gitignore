@@ -1,4 +1,5 @@
 .venv
+hls_utils.log
 migrations
 temp
 media

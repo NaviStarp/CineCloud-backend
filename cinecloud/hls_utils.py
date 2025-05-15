@@ -16,10 +16,10 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler('video_conversion.log')
+        logging.FileHandler('hls_utils.log')
     ]
 )
-logger = logging.getLogger('video_converter')
+logger = logging.getLogger('hls_utils')
 
 # Constantes
 MAX_RETRIES = 3
