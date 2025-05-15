@@ -6,7 +6,7 @@ from cinecloud.models import Categoria
 class Serie(models.Model):
     # Fields
     titulo = models.CharField(max_length=255, unique=True)
-    descripcion = models.TextField()
+    descripcion = models.TextField(null=True, blank=True)
     fecha_estreno = models.DateField()
     temporadas = models.IntegerField(null=True, blank=True) # Temporal
     categorias = models.ManyToManyField(Categoria, blank=True)

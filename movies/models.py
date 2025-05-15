@@ -5,7 +5,7 @@ from cinecloud.models import Categoria
 class Pelicula(models.Model):
     # Fields
     titulo = models.CharField(max_length=255,unique=True)
-    descripcion = models.TextField()
+    descripcion = models.TextField(null=True, blank=True)
     fecha_estreno = models.DateField()
     categorias = models.ManyToManyField(Categoria, blank=True)
     duracion = models.IntegerField(help_text="Duración en minutos")
