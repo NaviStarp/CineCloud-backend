@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from rest_framework.routers import DefaultRouter
-from series.views import getSeries,getEpisodiosPorSerie,newSeries,getSerieDetails,deleteSerie,editSerie
+from series.views import getSeries,getEpisodiosPorSerie,newSeries,getSerieDetails,deleteSerie,editSerie,deleteEpisode,editEpisode
 from movies.views import getMovie,getMovies,deleteMovie,editMovie
 from users.views import login,signup,prueba,authenticated,isAdmin,deleteUser,createAdmin,editUser,getAdministrators,add_watched_episode,add_watched_movie,watchedMovies,watchedEpisodes,getWatchedEpisode,getWatchedMovie
 from .views import status,upload_video,mediaView,signed_media,getCategories,newCategory,get_signed_url,editCategory,deleteCategory
@@ -64,4 +64,6 @@ urlpatterns = [
     path('series/delete/<int:pk>/', deleteSerie, name='delete_serie'),
     path('series/progress/save/', add_watched_episode, name='save_episode'),
     path('series/<int:pk>/episodios/', getEpisodiosPorSerie, name='get_episodios_por_serie'),
+    path('episodes/delete/<int:id>/', deleteEpisode, name='delete_episode'),
+    path('episodes/edit/<int:id>/', editEpisode, name='edit_episode'),
 ]

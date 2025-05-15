@@ -29,7 +29,7 @@ class Episodio(models.Model):
     titulo = models.CharField(max_length=255)
     temporada = models.IntegerField()
     numero = models.IntegerField(help_text="Número de episodio")
-    descripcion = models.TextField()
+    descripcion = models.TextField(null=True, blank=True)
     duracion = models.IntegerField(help_text="Duración en minutos", default=0, blank=True, null=True)
     video = models.FileField(upload_to='episodios/')
     imagen = models.ImageField(upload_to='episodios/', blank=True, null=True)

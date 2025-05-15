@@ -211,25 +211,34 @@ def deleteSerie(request, pk):
 
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated,IsAdminUser])
-def editEpisode(request, pk):
+@permission_classes([IsAuthenticated, IsAdminUser])
+def editEpisode(request, id):
     try:
-        episodio = Episodio.objects.get(pk=pk)
+        episodio = Episodio.objects.get(id=id)
     except Episodio.DoesNotExist:
-        return Response({'error': 'Episodio no encontrado'}, status=404)
-    
-    serializer = EpisodioSerializer(episodio, data=request.data, partial=True)
+        return Response({'error': 'Episodio not found'}, status=404)
+
+    data = request.data
+    imagen = request.FILES.get('imagen')
+    if imagen and episodio.imagen and hasattr(episodio.imagen, 'path') and os.path.isfile(episodio.imagen.path):
+        os.remove(episodio.imagen.path)
+        episodio.imagen = imagen
+
+    serializer = EpisodioSerializer(episodio, data=data, partial=True)
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data)
+
     return Response(serializer.errors, status=400)
+
+
 
 @api_view(['DELETE'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated,IsAdminUser])
-def deleteEpisode(request, pk):
+def deleteEpisode(request, id):
     try:
-        episodio = Episodio.objects.get(pk=pk)
+        episodio = Episodio.objects.get(id=id)
     except Episodio.DoesNotExist:
         return Response({'error': 'Episodio not found'}, status=404)
     

@@ -1,4 +1,5 @@
 .venv
+migrations
 temp
 media
 __pycache__
