@@ -8,6 +8,7 @@ Antes de comenzar, asegúrate de tener instalado:
 
 - **Python** (v3.8 o superior)
 - **Docker Compose** (para el despliegue de la base de datos)
+- **FFmpeg** (Procesamiento de video, necesario para la transcodificación y manipulación de archivos multimedia)
 
 ## Instalación
 
@@ -33,6 +34,13 @@ Sigue estos pasos para configurar el proyecto en tu entorno local:
     docker-compose up -d
     cd ..
     ```
+## Despliegue con Docker (Facil)
+
+Para desplegar la aplicación utilizando Docker:
+
+```bash
+docker-compose up
+```
 
 ## Iniciar el servidor de desarrollo
 
@@ -58,13 +66,6 @@ uvicorn --host 0.0.0.0 --port 8000 cinecloud.asgi:application
 ## Inicio automatico (Linux)
 ```bash
 ./start.sh
-```
-## Despliegue con Docker
-
-Para desplegar la aplicación utilizando Docker:
-
-```bash
-docker-compose up -d
 ```
 
 ## Estructura del proyecto
