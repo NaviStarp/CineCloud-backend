@@ -67,6 +67,10 @@ uvicorn --host 0.0.0.0 --port 8000 cinecloud.asgi:application
 ```bash
 ./start.sh
 ```
+## Creación de usuario administrador
+```bash
+python manage.py createsuperuser
+```
 
 ## Estructura del proyecto
 
