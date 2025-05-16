@@ -60,13 +60,13 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [("redis", 6379)],
         },
     },
 }
 # Celery
-CELERY_BROKER_URL = 'redis://localhost:6379/0'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_BROKER_URL = 'redis://redis:6379/0'
+CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -137,7 +137,7 @@ DATABASES = {
         'NAME': 'bd',  # DB Name
         'USER': 'admin',  # Username
         'PASSWORD': 'secret_password',  # Password
-        'HOST': 'localhost',  # <-- Usando localhost (Nombre del servicio)
+        'HOST': 'db',  # <-- Usando localhost (Nombre del servicio)
         'PORT': '5432',  # Puerto por defecto de PostgreSQL
     }
 }
