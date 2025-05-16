@@ -51,6 +51,10 @@ def safe_execute(func, *args, max_retries=MAX_RETRIES, retry_delay=RETRY_DELAY, 
         try:
             return func(*args, **kwargs)
         except Exception as e:
+            # Mostrar el error detallado si es un error de ffmpeg
+            if hasattr(e, 'stderr') and e.stderr:
+                logger.error(f"Error de ffmpeg: {e.stderr.decode('utf-8', errors='replace')}")
+            
             if attempt < max_retries - 1:
                 logger.warning(f"Intento {attempt+1} fallido: {str(e)}. Reintentando en {retry_delay} segundos...")
                 time.sleep(retry_delay)
@@ -68,23 +72,30 @@ def detect_gpus() -> Dict[str, bool]:
         'amd': False
     }
     
-    detection_methods = [
-        _detect_gpus_with_gputil,
-        _detect_gpus_with_pynvml,
-        _detect_gpus_with_ffmpeg
-    ]
+    # Primero comprobamos si ffmpeg tiene los codificadores disponibles
+    # Esta es la manera más confiable de verificar si podemos usar aceleración por hardware
+    ffmpeg_check = _detect_gpus_with_ffmpeg()
+    gpu_info['nvidia'] = ffmpeg_check.get('nvidia', False)
+    gpu_info['amd'] = ffmpeg_check.get('amd', False)
     
-    for method in detection_methods:
-        try:
-            method_gpu_info = method()
-            gpu_info['nvidia'] = gpu_info['nvidia'] or method_gpu_info.get('nvidia', False)
-            gpu_info['amd'] = gpu_info['amd'] or method_gpu_info.get('amd', False)
-            
-            # Si ya detectamos ambas GPUs, podemos salir
-            if gpu_info['nvidia'] and gpu_info['amd']:
-                break
-        except Exception as e:
-            logger.debug(f"Método de detección de GPU falló: {str(e)}")
+    # Solo si no se detectaron codificadores en ffmpeg, intentamos otros métodos
+    if not (gpu_info['nvidia'] or gpu_info['amd']):
+        detection_methods = [
+            _detect_gpus_with_gputil,
+            _detect_gpus_with_pynvml
+        ]
+        
+        for method in detection_methods:
+            try:
+                method_gpu_info = method()
+                gpu_info['nvidia'] = gpu_info['nvidia'] or method_gpu_info.get('nvidia', False)
+                gpu_info['amd'] = gpu_info['amd'] or method_gpu_info.get('amd', False)
+                
+                # Si ya detectamos ambas GPUs, podemos salir
+                if gpu_info['nvidia'] and gpu_info['amd']:
+                    break
+            except Exception as e:
+                logger.debug(f"Método de detección de GPU falló: {str(e)}")
     
     return gpu_info
 
@@ -137,13 +148,38 @@ def _detect_gpus_with_ffmpeg() -> Dict[str, bool]:
         )
         encoders_output = ffmpeg_encoders.stdout.decode()
         
+        # Verificar si el codificador realmente está disponible
         if 'h264_nvenc' in encoders_output:
-            gpu_info['nvidia'] = True
-            logger.info("Codificador NVIDIA detectado en ffmpeg")
+            # Prueba adicional para verificar que realmente funciona
+            test_cmd = [
+                'ffmpeg', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc=duration=1:size=128x96:rate=1', 
+                '-c:v', 'h264_nvenc', '-f', 'null', '-'
+            ]
+            try:
+                test_result = subprocess.run(test_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+                if test_result.returncode == 0:
+                    gpu_info['nvidia'] = True
+                    logger.info("Codificador NVIDIA h264_nvenc verificado y funcionando")
+                else:
+                    logger.warning(f"Codificador NVIDIA h264_nvenc detectado pero no funciona correctamente: {test_result.stderr.decode()}")
+            except Exception as e:
+                logger.warning(f"Codificador NVIDIA h264_nvenc detectado pero falló la prueba: {str(e)}")
             
         if 'h264_amf' in encoders_output:
-            gpu_info['amd'] = True
-            logger.info("Codificador AMD detectado en ffmpeg")
+            # Prueba adicional para AMD
+            test_cmd = [
+                'ffmpeg', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc=duration=1:size=128x96:rate=1', 
+                '-c:v', 'h264_amf', '-f', 'null', '-'
+            ]
+            try:
+                test_result = subprocess.run(test_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+                if test_result.returncode == 0:
+                    gpu_info['amd'] = True
+                    logger.info("Codificador AMD h264_amf verificado y funcionando")
+                else:
+                    logger.warning(f"Codificador AMD h264_amf detectado pero no funciona correctamente: {test_result.stderr.decode()}")
+            except Exception as e:
+                logger.warning(f"Codificador AMD h264_amf detectado pero falló la prueba: {str(e)}")
     except subprocess.TimeoutExpired:
         logger.warning("Timeout al ejecutar ffmpeg -encoders")
     except Exception as e:
@@ -152,17 +188,30 @@ def _detect_gpus_with_ffmpeg() -> Dict[str, bool]:
 
 def get_video_encoder_settings(force_nvidia=False, force_amd=False, force_cpu=False) -> EncoderSettings:
     """Determina los ajustes de codificación según la disponibilidad de GPU"""
-    if force_nvidia:
-        logger.info("Forzando uso de codificador NVIDIA")
-        return EncoderSettings(codec='h264_nvenc', preset='p4')
-    
-    if force_amd:
-        logger.info("Forzando uso de codificador AMD")
-        return EncoderSettings(codec='h264_amf', quality='balanced')
-    
     if force_cpu:
         logger.info("Forzando uso de codificador CPU")
         return EncoderSettings(codec='libx264', preset='medium')
+    
+    # Si hay forzado específico, primero intentar verificar que funcione realmente
+    if force_nvidia:
+        logger.info("Comprobando disponibilidad de codificador NVIDIA forzado")
+        gpu_info = _detect_gpus_with_ffmpeg()
+        if gpu_info['nvidia']:
+            logger.info("Forzando uso de codificador NVIDIA (verificado)")
+            return EncoderSettings(codec='h264_nvenc', preset='p4')
+        else:
+            logger.warning("Codificador NVIDIA forzado no está disponible, usando CPU")
+            return EncoderSettings(codec='libx264', preset='medium')
+    
+    if force_amd:
+        logger.info("Comprobando disponibilidad de codificador AMD forzado")
+        gpu_info = _detect_gpus_with_ffmpeg()
+        if gpu_info['amd']:
+            logger.info("Forzando uso de codificador AMD (verificado)")
+            return EncoderSettings(codec='h264_amf', quality='balanced')
+        else:
+            logger.warning("Codificador AMD forzado no está disponible, usando CPU")
+            return EncoderSettings(codec='libx264', preset='medium')
     
     # Si no se fuerza ningún codificador, detectar automáticamente
     gpu_info = detect_gpus()
@@ -259,11 +308,22 @@ def segment_original_video(
         logger.info(f"Argumentos de salida: {output_args}")
         
         def segment_video():
-            ffmpeg.output(stream, output_path, **output_args).run(
-                capture_stdout=True, 
-                capture_stderr=True,
-                overwrite_output=True
-            )
+            # Generar el comando para poder imprimirlo en caso de error
+            cmd = ffmpeg.output(stream, output_path, **output_args)
+            logger.debug(f"Comando ffmpeg: {cmd.compile()}")
+            
+            try:
+                stdout, stderr = cmd.run(
+                    capture_stdout=True, 
+                    capture_stderr=True,
+                    overwrite_output=True
+                )
+                return stdout, stderr
+            except ffmpeg.Error as e:
+                # Mostrar la salida de error completa de ffmpeg
+                if e.stderr:
+                    logger.error(f"Error de ffmpeg: {e.stderr.decode('utf-8', errors='replace')}")
+                raise
         
         # Ejecutar con reintentos
         safe_execute(segment_video)
@@ -330,11 +390,20 @@ def convert_to_resolution(
             output_args['b:a'] = '128k'
             
             def convert_with_audio():
-                ffmpeg.output(padded_stream, audio_stream, output_path, **output_args).run(
-                    capture_stdout=True, 
-                    capture_stderr=True,
-                    overwrite_output=True
-                )
+                cmd = ffmpeg.output(padded_stream, audio_stream, output_path, **output_args)
+                logger.debug(f"Comando ffmpeg: {cmd.compile()}")
+                
+                try:
+                    stdout, stderr = cmd.run(
+                        capture_stdout=True, 
+                        capture_stderr=True,
+                        overwrite_output=True
+                    )
+                    return stdout, stderr
+                except ffmpeg.Error as e:
+                    if e.stderr:
+                        logger.error(f"Error de ffmpeg: {e.stderr.decode('utf-8', errors='replace')}")
+                    raise
             
             # Ejecutar con reintentos
             safe_execute(convert_with_audio)
@@ -342,11 +411,20 @@ def convert_to_resolution(
             logger.warning(f"No se detectó audio en el video. Procesando solo video.")
             
             def convert_without_audio():
-                ffmpeg.output(padded_stream, output_path, **output_args).run(
-                    capture_stdout=True, 
-                    capture_stderr=True,
-                    overwrite_output=True
-                )
+                cmd = ffmpeg.output(padded_stream, output_path, **output_args)
+                logger.debug(f"Comando ffmpeg: {cmd.compile()}")
+                
+                try:
+                    stdout, stderr = cmd.run(
+                        capture_stdout=True, 
+                        capture_stderr=True,
+                        overwrite_output=True
+                    )
+                    return stdout, stderr
+                except ffmpeg.Error as e:
+                    if e.stderr:
+                        logger.error(f"Error de ffmpeg: {e.stderr.decode('utf-8', errors='replace')}")
+                    raise
             
             # Ejecutar con reintentos
             safe_execute(convert_without_audio)
@@ -404,16 +482,28 @@ def fallback_to_original(
     encoder_settings: EncoderSettings
 ) -> bool:
     """Función de respaldo que intenta procesar el video en su resolución original"""
-    logger.warning("Usando método de respaldo para procesar el video en su resolución original")
+    logger.warning("Usando método de respaldo para procesar el video con libx264 (CPU)")
     try:
-        success, width, height, bitrate = segment_original_video(input_path, output_dir, encoder_settings)
+        # Usar explícitamente el codificador de CPU
+        cpu_encoder = EncoderSettings(codec='libx264', preset='medium')
+        
+        success, width, height, bitrate = segment_original_video(input_path, output_dir, cpu_encoder)
         if success:
             create_master_playlist(output_dir, [(width, height, bitrate)])
             logger.info("El método de respaldo se completó correctamente")
             return True
         else:
-            logger.error("El método de respaldo falló al segmentar el video")
-            return False
+            # Intentar con el codificador más básico posible
+            logger.warning("Intentando con codificador de último recurso...")
+            basic_encoder = EncoderSettings(codec='libx264', preset='ultrafast')
+            success, width, height, bitrate = segment_original_video(input_path, output_dir, basic_encoder)
+            if success:
+                create_master_playlist(output_dir, [(width, height, bitrate)])
+                logger.info("El método de respaldo con codificador básico se completó correctamente")
+                return True
+            else:
+                logger.error("El método de respaldo falló al segmentar el video incluso con codificador básico")
+                return False
     except Exception as e:
         logger.error(f"Error durante el procesamiento de respaldo: {str(e)}")
         logger.error(traceback.format_exc())
@@ -446,6 +536,10 @@ def process_video(
         
         # Obtener la configuración del codificador
         encoder_settings = get_video_encoder_settings(force_nvidia, force_amd, force_cpu)
+        
+        # Si el usuario forzó CPU, asegurarnos de usar libx264
+        if force_cpu:
+            encoder_settings = EncoderSettings(codec='libx264', preset='medium')
         
         # Verificar si es un video de baja resolución
         if is_low_resolution(original_width, original_height):
@@ -533,13 +627,18 @@ def process_video(
         # Si todas las conversiones fallaron, intentar con el video original
         if not successful_resolutions:
             logger.warning("Todas las conversiones fallaron. Procesando solo el video original.")
-            success, width, height, bitrate = segment_original_video(input_path, output_dir, encoder_settings)
+            
+            # Intentar con el codificador de CPU para mayor compatibilidad
+            cpu_encoder = EncoderSettings(codec='libx264', preset='medium')
+            logger.info("Cambiando a codificador CPU para mayor compatibilidad")
+            
+            success, width, height, bitrate = segment_original_video(input_path, output_dir, cpu_encoder)
             if success:
                 create_master_playlist(output_dir, [(width, height, bitrate)])
                 return True
             else:
-                logger.error("No se pudo procesar el video ni siquiera en su resolución original.")
-                return False
+                logger.error("No se pudo procesar el video ni siquiera en su resolución original con CPU.")
+                return fallback_to_original(input_path, output_dir, cpu_encoder)
                 
         # Crear el archivo master playlist con las resoluciones que fueron convertidas exitosamente
         if successful_resolutions:
