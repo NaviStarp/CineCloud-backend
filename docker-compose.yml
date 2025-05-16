@@ -4,14 +4,14 @@ services:
   db:
     image: postgres:15
     restart: always
-    environment:
-      POSTGRES_DB: bd
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: secret_password
+    env_file:
+      - .env.docker
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
 
   redis:
     image: redis:latest
@@ -20,6 +20,8 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - backend
 
   app:
     build: .
@@ -27,13 +29,17 @@ services:
     depends_on:
       - db
       - redis
-    environment:
-      DATABASE_URL: postgres://admin:secret_password@db:5432/bd
-      REDIS_URL: redis://redis:6379
+    env_file:
+      - .env.docker
     ports:
-      - "8000:8000"  # Solo si tu app expone algún puerto
+      - "8000:8000"
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
 
 volumes:
   postgres_data:
   redis_data:
-
