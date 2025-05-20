@@ -25,23 +25,52 @@ def newSeries(request):
     titulo = data.get('titulo')
     descripcion = data.get('descripcion')
     fecha_estreno = data.get('fecha_estreno')
+    
+    # Validar formato de fecha
+    try:
+        from datetime import datetime
+        import re
+        
+        if fecha_estreno:
+            pattern = r'(\w+) (\w+) (\d+) (\d+) (\d+):(\d+):(\d+) GMT([+-]\d+)'
+            match = re.search(pattern, fecha_estreno)
+            
+            if match:
+                month_map = {
+                    'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+                    'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+                }
+                
+                _, month_str, day, year, hour, minute, second, _ = match.groups()
+                month = month_map.get(month_str, 1)  # Default to 1 if month not found
+                
+                dt = datetime(int(year), month, int(day))
+                fecha_estreno = dt.strftime('%Y-%m-%d')
+            else:
+                print(f"No se pudo parsear la fecha: {fecha_estreno}")
+                return Response({"error": "El formato de fecha no es reconocido"}, status=400)
+    except Exception as e:
+        print(f"Error al convertir la fecha: {fecha_estreno}, Error: {str(e)}")
+        return Response({"error": "El campo 'fecha_estreno' debe tener un formato válido"}, status=400)
+    
     temporadas = data.get('temporadas')
     categorias = data.get('categorias')
     imagen = request.FILES.get('imagen')
     
-    # Validar que todos los campos requeridos existan
-    if not all([titulo, descripcion, fecha_estreno, temporadas, imagen]):
-        return Response({"error": "Todos los campos son obligatorios"}, status=400)
+    # Validar campos requeridos
+    if not titulo:
+        return Response({"error": "El campo 'titulo' es requerido"}, status=400)
     
     # Convertir temporadas a entero si es necesario
     try:
-        temporadas = int(temporadas)
+        temporadas = int(temporadas) if temporadas is not None else 0
     except (ValueError, TypeError):
         return Response({"error": "El valor de temporadas debe ser un número"}, status=400)
     
     # Procesar categorías
     categorias_obj = None
     if categorias:
+        import json
         # Si categorias es una cadena, intentar convertirla a lista
         if isinstance(categorias, str):
             try:
@@ -73,7 +102,7 @@ def newSeries(request):
         return Response(serializer.data, status=201)
     except Exception as e:
         return Response({"error": str(e)}, status=500)
-
+    
 class SerieViewSet(viewsets.ModelViewSet):
     queryset = Serie.objects.all()
     serializer_class = SerieSerializer

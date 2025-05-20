@@ -7,7 +7,7 @@ class Serie(models.Model):
     # Fields
     titulo = models.CharField(max_length=255, unique=True)
     descripcion = models.TextField(null=True, blank=True)
-    fecha_estreno = models.DateField()
+    fecha_estreno = models.DateField(null=True, blank=True)
     temporadas = models.IntegerField(null=True, blank=True) # Temporal
     categorias = models.ManyToManyField(Categoria, blank=True)
     imagen = models.ImageField(upload_to='series/')
