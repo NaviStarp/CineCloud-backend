@@ -4,31 +4,32 @@ FROM python:3.13
 # Create the app directory
 RUN mkdir /app
 
-# Set the working directory inside the container
+# Establecer el directorio de trabajo dentro del contenedor
 WORKDIR /app
 
-# Set environment variables
-# Prevents Python from writing pyc files to disk
+# Configurar variables de entorno
+# Evita que Python escriba archivos pyc en el disco
 ENV PYTHONDONTWRITEBYTECODE=1
-# Prevents Python from buffering stdout and stderr
+# Evita que Python almacene en búfer stdout y stderr
 ENV PYTHONUNBUFFERED=1
 
+# Instalar dependencias del sistema necesarias
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip
+# Actualizar pip
 RUN pip install --upgrade pip
 
-# Copy the requirements file and install dependencies
+# Copiar el archivo de requisitos e instalar dependencias
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the Django project to the container
+# Copiar el proyecto Django al contenedor
 COPY . /app/
 
-# Expose the Django port
+# Exponer el puerto de Django
 EXPOSE 8000
 
-# Run commands directly without a script file
-CMD sh -c "python manage.py makemigrations && python manage.py migrate && uvicorn cinecloud.asgi:application --host 0.0.0.0 --port 8000 --reload"
+# Ejecutar comandos directamente 
+CMD sh -c "python manage.py makemigrations && python manage.py migrate && python manage.py create_admin && uvicorn cinecloud.asgi:application --host 0.0.0.0 --port 8000 --reload"
