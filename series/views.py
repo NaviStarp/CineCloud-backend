@@ -27,32 +27,16 @@ def newSeries(request):
     fecha_estreno = data.get('fecha_estreno')
     
     # Validar formato de fecha
+    from datetime import datetime
     try:
-        from datetime import datetime
-        import re
-        
-        if fecha_estreno:
-            pattern = r'(\w+) (\w+) (\d+) (\d+) (\d+):(\d+):(\d+) GMT([+-]\d+)'
-            match = re.search(pattern, fecha_estreno)
-            
-            if match:
-                month_map = {
-                    'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
-                    'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
-                }
-                
-                _, month_str, day, year, hour, minute, second, _ = match.groups()
-                month = month_map.get(month_str, 1)  # Default to 1 if month not found
-                
-                dt = datetime(int(year), month, int(day))
-                fecha_estreno = dt.strftime('%Y-%m-%d')
-            else:
-                print(f"No se pudo parsear la fecha: {fecha_estreno}")
-                return Response({"error": "El formato de fecha no es reconocido"}, status=400)
-    except Exception as e:
-        print(f"Error al convertir la fecha: {fecha_estreno}, Error: {str(e)}")
-        return Response({"error": "El campo 'fecha_estreno' debe tener un formato válido"}, status=400)
-    
+        if fecha_estreno and fecha_estreno != '':
+            # Validar que el formato sea 'YYYY-MM-DD'
+            datetime.strptime(fecha_estreno, '%Y-%m-%d')
+        else:
+            if not fecha_estreno or fecha_estreno == '':
+                fecha_estreno = datetime.now().strftime('%Y-%m-%d')
+    except ValueError:
+        fecha_estreno = datetime.now().strftime('%Y-%m-%d')
     temporadas = data.get('temporadas')
     categorias = data.get('categorias')
     imagen = request.FILES.get('imagen')
